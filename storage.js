@@ -9,7 +9,6 @@ const DATA_FILE = path.join(DATA_DIR, 'transcripts.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const GROUPS_FILE = path.join(DATA_DIR, 'groups.json');
 
-// Papka va fayllarni tekshirish
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
@@ -22,7 +21,6 @@ function safeRead(filePath, fallback = []) {
     }
     return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
   } catch (e) {
-    console.error(`Xatolik o'qishda ${filePath}:`, e);
     return fallback;
   }
 }
@@ -35,30 +33,25 @@ function safeWrite(filePath, data) {
   }
 }
 
-// Barcha konspektlar
 export function getAllTranscripts(userId = null) {
   const items = safeRead(DATA_FILE, []);
   if (!userId || userId === 'demo') return items;
   return items.filter(i => i.userId === String(userId) || i.userId === 'demo');
 }
 
-// Bitta konspekt
 export function getTranscriptById(id) {
   const items = getAllTranscripts();
   return items.find(i => i.id === id) || null;
 }
 
-// Foydalanuvchining eng oxirgi audiosi (Chat konteksti uchun)
 export function getLastTranscriptByUser(userId) {
   const items = getAllTranscripts(userId);
   return items[0] || null;
 }
 
-// Yangi konspekt saqlash
 export function saveTranscript(data) {
   const items = safeRead(DATA_FILE, []);
   
-  // Avtomatik kategoriya aniqlash
   let category = 'Umumiy';
   const text = ((data.title || '') + ' ' + (data.summary || '')).toLowerCase();
   if (text.includes('dori') || text.includes("ko'z") || text.includes('shifokor') || text.includes("og'riq")) {
@@ -67,22 +60,29 @@ export function saveTranscript(data) {
     category = 'Ish & Biznes';
   } else if (text.includes('dars') || text.includes('imtihon') || text.includes('universitet')) {
     category = "Ta'lim";
-  } else if (text.includes('pul') || text.includes('byudjet') || text.includes('dollar') || text.includes('to\'lov')) {
+  } else if (text.includes('pul') || text.includes('byudjet') || text.includes('dollar') || text.includes("to'lov")) {
     category = 'Moliya';
   }
+
+  // Hisoblangan statistika (so'zlar soni va WPM)
+  const fullText = data.full_transcript || '';
+  const wordsCount = fullText.trim() ? fullText.trim().split(/\s+/).length : 0;
+  const readingTimeSec = Math.max(1, Math.round(wordsCount / 2.5)); // o'rtacha 150 wpm
 
   const newItem = {
     id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
     date: new Date().toISOString(),
     category,
+    wordsCount,
+    readingTimeSec,
     isCompleted: false,
+    completedActions: {},
     ...data
   };
 
   items.unshift(newItem);
   safeWrite(DATA_FILE, items);
 
-  // Foydalanuvchi statistikasini oshirish
   if (data.userId) {
     incrementUserAudioCount(data.userId);
   }
@@ -90,7 +90,6 @@ export function saveTranscript(data) {
   return newItem;
 }
 
-// Topshiriq holatini o'zgartirish
 export function toggleActionItem(id, itemIndex) {
   const items = safeRead(DATA_FILE, []);
   const item = items.find(i => i.id === id);
@@ -103,7 +102,6 @@ export function toggleActionItem(id, itemIndex) {
   return null;
 }
 
-// Konspektni o'chirish
 export function deleteTranscript(id) {
   let items = safeRead(DATA_FILE, []);
   const filtered = items.filter(i => i.id !== id);
@@ -111,8 +109,26 @@ export function deleteTranscript(id) {
   return true;
 }
 
-// Foydalanuvchilarni saqlash / yangilash
-export function registerOrUpdateUser(user) {
+// Foydalanuvchi rejimi (Mode)
+export function getUserMode(userId) {
+  const users = safeRead(USERS_FILE, []);
+  const u = users.find(x => x.id === String(userId));
+  return u?.mode || 'standard';
+}
+
+export function setUserMode(userId, mode) {
+  const users = safeRead(USERS_FILE, []);
+  let u = users.find(x => x.id === String(userId));
+  if (u) {
+    u.mode = mode;
+    safeWrite(USERS_FILE, users);
+    return true;
+  }
+  return false;
+}
+
+// Foydalanuvchi ro'yxatga olish / referal
+export function registerOrUpdateUser(user, refBy = null) {
   if (!user || !user.id) return;
   const users = safeRead(USERS_FILE, []);
   const uid = String(user.id);
@@ -124,10 +140,23 @@ export function registerOrUpdateUser(user) {
       username: user.username || '',
       firstName: user.first_name || '',
       language: user.language_code || 'uz',
+      mode: 'standard',
+      points: 10,
+      refBy: refBy ? String(refBy) : null,
+      refCount: 0,
       joinedAt: new Date().toISOString(),
       audioCount: 0
     };
     users.push(existing);
+
+    // Agar taklif qilgan odam bo'lsa, unga ball berish
+    if (refBy) {
+      const parent = users.find(p => p.id === String(refBy));
+      if (parent) {
+        parent.points = (parent.points || 0) + 10;
+        parent.refCount = (parent.refCount || 0) + 1;
+      }
+    }
   } else {
     existing.username = user.username || existing.username;
     existing.firstName = user.first_name || existing.firstName;
@@ -136,6 +165,11 @@ export function registerOrUpdateUser(user) {
 
   safeWrite(USERS_FILE, users);
   return existing;
+}
+
+export function getUserData(userId) {
+  const users = safeRead(USERS_FILE, []);
+  return users.find(u => u.id === String(userId)) || null;
 }
 
 export function getAllUsers() {
@@ -147,11 +181,11 @@ function incrementUserAudioCount(userId) {
   const user = users.find(u => u.id === String(userId));
   if (user) {
     user.audioCount = (user.audioCount || 0) + 1;
+    user.points = (user.points || 0) + 1; // Har bir audio uchun 1 ball
     safeWrite(USERS_FILE, users);
   }
 }
 
-// Guruhlarni qayd qilish
 export function registerGroup(chat) {
   if (!chat || !chat.id) return;
   const groups = safeRead(GROUPS_FILE, []);
@@ -179,7 +213,6 @@ export function getAllGroups() {
   return safeRead(GROUPS_FILE, []);
 }
 
-// Tizim umumiy statistikasi (Admin uchun)
 export function getSystemStats() {
   const transcripts = safeRead(DATA_FILE, []);
   const users = safeRead(USERS_FILE, []);
