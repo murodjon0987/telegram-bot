@@ -1,0 +1,53 @@
+[
+  {
+    "id": "sample-1",
+    "userId": "demo",
+    "title": "Startup MVP va Dizayn Muhokamasi",
+    "language": "O'zbekcha",
+    "date": "2026-09-22T07:08:52.495Z",
+    "duration": "02:15",
+    "summary": "Haftalik dasturlash rejalari, Telegram Web App integratsiyasi va foydalanuvchi interfeysidagi asosiy tugmalar dizayni tasdiqlandi.",
+    "action_items": [
+      "Telegram bot uchun @BotFather orqali yangi token olish",
+      "Web App interfeysini qorong'u rejim (dark mode) bilan sinash",
+      "Juma kuniga qadar demo versiyani guruhga ulashish"
+    ],
+    "full_transcript": "Assalomu alaykum do'stlar. Bugungi rejamiz bo'yicha Telegram botimizning frontend qismini yakunlashimiz kerak. Ovozli xabarlar kelganda bir zumda tahlil qilinishi juda muhim. Web App dizayniga ham e'tibor beringlar, qorong'u rejimda juda chiroyli ko'rinsin. Kimda savol bo'lsa, chatda yozing.",
+    "isCompleted": false,
+    "completedActions": {
+      "0": true
+    }
+  },
+  {
+    "id": "sample-2",
+    "userId": "demo",
+    "title": "Mijoz bilan muzokara: E-commerce loyihasi",
+    "language": "O'zbekcha",
+    "date": "2026-09-22T04:53:52.495Z",
+    "duration": "04:30",
+    "summary": "Mijoz onlayn do'kon uchun to'lov tizimlarini (Click, Payme) ulashni va buyurtmalar holatini SMS orqali yuborishni so'radi.",
+    "action_items": [
+      "Click va Payme API hujjatlarini o'rganish",
+      "Hisob-kitob sahifasini yangilash va hisob-faktura (invoice) generatsiyasini qo'shish",
+      "Dushanba soat 10:00 da oraliq hisobot berish"
+    ],
+    "full_transcript": "Mijoz bilan gaplashdik. Ular buyurtmalarni avtomatik tarzda qabul qilib, to'lov muvaffaqiyatli bo'lsa xaridorga chek yuborishni xohlashyapti. Texnik topshiriqni tayyorlab, jamoaga yuboraman.",
+    "isCompleted": true
+  },
+  {
+    "id": "sample-3",
+    "userId": "demo",
+    "title": "Marketing va Target Reklama Byudjeti",
+    "language": "Ruscha / O'zbekcha",
+    "date": "2026-09-21T07:53:52.495Z",
+    "duration": "01:45",
+    "summary": "Kelasi oy uchun 500$ byudjet ajratildi. Asosiy e'tibor Instagram Reels va Telegram kanallaridagi postlarga qaratiladi.",
+    "action_items": [
+      "3 ta yangi video rolik tayyorlash",
+      "Kreativ bannerlar dizaynini yakunlash",
+      "A/B test natijalarini haftalik hisobotga kiritish"
+    ],
+    "full_transcript": "Biz target byudjetini tasdiqladik. Birinchi navbatda qiziqarli video kontentga urg'u beramiz. Samaradorlikni har kuni kuzatib borish shart.",
+    "isCompleted": false
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "name": "voice-protocol-bot",
+  "version": "1.0.0",
+  "description": "Telegram Voice-to-Summary & Meeting Protocol Bot with WebApp",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "bot": "node bot.js"
+  },
+  "keywords": ["telegram", "bot", "ai", "transcribe", "summary", "uzbek"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^2.24.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "grammy": "^1.35.0"
+  }
+}
