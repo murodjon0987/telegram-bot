@@ -4,17 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>VoiceProtocol AI — Ovozli Xabarlar Konspekti & Majlis Protokoli</title>
-  <meta name="description" content="Telegram ovozli xabarlarini so'zma-so'z transkripsiya qilish, qisqacha xulosa va vazifalar ro'yxatini tuzish uchun sun'iy intellektli platforma">
-  <!-- Google Fonts: Plus Jakarta Sans -->
+  <meta name="description" content="Telegram ovozli va video xabarlarini so'zma-so'z transkripsiya qilish, xulosa va topshiriqlar ro'yxatini tuzuvchi AI platforma">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- Telegram Web App SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Orqa fon nuri va effektlari -->
   <div class="bg-glow bg-glow-1"></div>
   <div class="bg-glow bg-glow-2"></div>
 
@@ -46,19 +43,35 @@
           <div class="metric-value" id="metric-total-count">0</div>
         </div>
         <div class="metric-card">
-          <span class="metric-label">Topshiriqlar Bajarilishi</span>
+          <span class="metric-label">Vazifalar Bajarilishi</span>
           <div class="metric-value" id="metric-progress-percent">0%</div>
           <div class="progress-bar-bg">
             <div class="progress-bar-fill" id="metric-progress-bar" style="width: 0%;"></div>
           </div>
         </div>
         <div class="metric-card">
-          <span class="metric-label">Tahlil Dvigateli</span>
-          <div class="metric-value highlight-text">Gemini 2.5 Flash</div>
+          <span class="metric-label">AI Modeli</span>
+          <div class="metric-value highlight-text">Gemini 3.6 Flash</div>
         </div>
       </div>
 
-      <!-- Search & Filter Controls -->
+      <!-- Live Voice Recorder Box -->
+      <div class="recorder-box" id="recorder-card">
+        <div class="recorder-left">
+          <button class="record-mic-btn" id="record-mic-btn" title="Ovoz yozishni boshlash">
+            <span class="mic-icon">🎙️</span>
+          </button>
+          <div class="record-info">
+            <h3 id="record-status-text">Jonli ovoz yozish</h3>
+            <p id="record-timer-text">Mikrofonni bosing va gapiring</p>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-stop-analyze" style="display: none;">
+          ⚡ Tahlil qilish
+        </button>
+      </div>
+
+      <!-- Controls -->
       <div class="controls-section">
         <div class="search-box">
           <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -70,34 +83,16 @@
         </div>
 
         <div class="filter-pills" id="filter-pills-container">
-          <button class="filter-pill active" data-filter="all" id="filter-all-btn">Barchasi</button>
-          <button class="filter-pill" data-filter="with-tasks" id="filter-tasks-btn">Topshiriqlar bor</button>
-          <button class="filter-pill" data-filter="uzbek" id="filter-uz-btn">O'zbekcha</button>
+          <button class="filter-pill active" data-filter="all">Barchasi</button>
+          <button class="filter-pill" data-filter="Ish & Biznes">💼 Ish & Biznes</button>
+          <button class="filter-pill" data-filter="Salomatlik">🏥 Salomatlik</button>
+          <button class="filter-pill" data-filter="with-tasks">✅ Topshiriqlar bor</button>
         </div>
       </div>
     </header>
 
     <!-- Asosiy Kontent -->
     <main class="main-content">
-      <!-- Demo Tezkor Test Vidjeti -->
-      <section class="test-simulator-box" id="test-simulator-card">
-        <div class="simulator-content">
-          <div class="simulator-icon">🎙️</div>
-          <div class="simulator-text">
-            <h3>Yangi ovozni sinab ko'rish</h3>
-            <p>Telegram bot orqali ovozli xabar yuboring yoki quyidagi tugma bilan namuna qo'shing</p>
-          </div>
-        </div>
-        <div class="simulator-actions">
-          <button class="btn btn-primary" id="btn-add-demo-sample">
-            <span class="btn-icon">⚡</span> Tezkor Namuna Qo'shish
-          </button>
-          <button class="btn btn-secondary" id="btn-open-bot-guide">
-            <span class="btn-icon">🤖</span> Bot Qo'llanmasi
-          </button>
-        </div>
-      </section>
-
       <!-- Transkriptlar ro'yxati -->
       <section class="transcripts-section">
         <div class="section-header">
@@ -106,57 +101,19 @@
         </div>
 
         <div class="transcripts-list" id="transcripts-list-container">
-          <!-- Yuklanmoqda skletik animatsiyasi -->
           <div class="loading-state" id="loading-spinner">
             <div class="spinner"></div>
             <p>Konspektlar yuklanmoqda...</p>
           </div>
         </div>
 
-        <!-- Bo'sh holat (Empty state) -->
         <div class="empty-state" id="empty-state-view" style="display: none;">
           <div class="empty-icon">📭</div>
           <h3>Hech qanday konspekt topilmadi</h3>
-          <p>Botga birinchi ovozli xabarni yuboring yoki filtr so'zini tozalang.</p>
+          <p>Botga ovozli xabar yoki krujochek yuboring yoki yuqoridagi mikrofondan yozing.</p>
         </div>
       </section>
     </main>
-
-    <!-- Bot Qo'llanma Modali -->
-    <div class="modal-overlay" id="guide-modal" style="display: none;">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>Telegram Botdan Foydalanish</h3>
-          <button class="modal-close-btn" id="close-guide-modal-btn">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="guide-step">
-            <div class="step-num">1</div>
-            <div class="step-text">
-              <strong>Telegram botga kiring:</strong>
-              <p>Botingizga <code>/start</code> buyrug'ini yuboring.</p>
-            </div>
-          </div>
-          <div class="guide-step">
-            <div class="step-num">2</div>
-            <div class="step-text">
-              <strong>Ovozli xabar yuboring:</strong>
-              <p>Microfon tugmasini bosib gapiring yoki majlis audio faylini forward qiling.</p>
-            </div>
-          </div>
-          <div class="guide-step">
-            <div class="step-num">3</div>
-            <div class="step-text">
-              <strong>Tayyor natijani oling:</strong>
-              <p>Bot so'zma-so'z matn, qisqacha xulosa va topshiriqlarni bir zumda chiqarib beradi va shu Web App'da yangilanadi!</p>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-primary" id="btn-modal-got-it" style="width: 100%;">Tushundim!</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Toast bildirishnoma -->
     <div class="toast-notification" id="toast-notify" style="display: none;">
@@ -165,7 +122,7 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-      <p>VoiceProtocol AI &bull; Telegram Mini App &bull; Powered by Gemini 2.5</p>
+      <p>VoiceProtocol AI &bull; Telegram Mini App &bull; Powered by Gemini 3.6 Flash</p>
     </footer>
   </div>
 

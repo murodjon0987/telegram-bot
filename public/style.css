@@ -243,6 +243,71 @@ body {
   transition: width var(--transition-normal);
 }
 
+/* Live Audio Recorder */
+.recorder-box {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(99, 102, 241, 0.1) 100%);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.recorder-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.record-mic-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  cursor: pointer;
+  box-shadow: 0 4px 15px var(--glow-cyan);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.record-mic-btn:hover {
+  transform: scale(1.05);
+}
+
+.record-mic-btn.recording {
+  background: #ef4444;
+  animation: recordingPulse 1.2s infinite;
+}
+
+@keyframes recordingPulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.record-info h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.record-info p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.tag-cat {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+}
+
 /* Controls */
 .controls-section {
   display: flex;

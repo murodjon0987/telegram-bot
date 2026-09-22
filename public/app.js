@@ -20,30 +20,32 @@ const metricProgressBar = document.getElementById('metric-progress-bar');
 const toastNotify = document.getElementById('toast-notify');
 const toastMessageText = document.getElementById('toast-message-text');
 
+// Audio Yozish DOM
+const recordMicBtn = document.getElementById('record-mic-btn');
+const recordStatusText = document.getElementById('record-status-text');
+const recordTimerText = document.getElementById('record-timer-text');
+const btnStopAnalyze = document.getElementById('btn-stop-analyze');
+
+let mediaRecorder = null;
+let audioChunks = [];
+let recordInterval = null;
+let recordSeconds = 0;
+
 // Telegram WebApp sozlamalari
 function initTelegram() {
   if (tg) {
     try {
       tg.ready();
       tg.expand();
-      
-      // Ranglarni moslash
-      if (tg.setHeaderColor) {
-        tg.setHeaderColor('#0a0d14');
-      }
-      if (tg.setBackgroundColor) {
-        tg.setBackgroundColor('#0a0d14');
-      }
+      if (tg.setHeaderColor) tg.setHeaderColor('#0a0d14');
+      if (tg.setBackgroundColor) tg.setBackgroundColor('#0a0d14');
 
-      // Foydalanuvchi ma'lumotlarini o'qish
       const user = tg.initDataUnsafe?.user;
       if (user) {
         const userNameElem = document.getElementById('user-display-name');
         const userAvatarElem = document.getElementById('user-avatar-img');
-        
         const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'Foydalanuvchi';
         if (userNameElem) userNameElem.textContent = fullName;
-        
         if (userAvatarElem) {
           const initials = (user.first_name?.[0] || 'U') + (user.last_name?.[0] || '');
           userAvatarElem.textContent = initials.toUpperCase();
@@ -55,16 +57,12 @@ function initTelegram() {
   }
 }
 
-// Haptic (tebranish) effekti
 function triggerHaptic(type = 'light') {
   if (tg?.HapticFeedback) {
-    try {
-      tg.HapticFeedback.impactOccurred(type);
-    } catch (e) {}
+    try { tg.HapticFeedback.impactOccurred(type); } catch (e) {}
   }
 }
 
-// Toast xabarini chiqarish
 function showToast(message) {
   if (!toastNotify || !toastMessageText) return;
   toastMessageText.textContent = message;
@@ -74,7 +72,7 @@ function showToast(message) {
   }, 2200);
 }
 
-// Konspektlarni serverdan yuklash
+// Konspektlarni yuklash
 async function loadTranscripts() {
   try {
     const res = await fetch('/api/transcripts');
@@ -84,7 +82,6 @@ async function loadTranscripts() {
       renderTranscripts();
       updateMetrics();
 
-      // Agar URL da maxsus ?item= parametri bo'lsa, uni topib ajratib ko'rsatish
       const urlParams = new URLSearchParams(window.location.search);
       const targetId = urlParams.get('item');
       if (targetId) {
@@ -106,12 +103,11 @@ async function loadTranscripts() {
   }
 }
 
-// Metrikalarni hisoblash
+// Metrikalar
 function updateMetrics() {
   if (!metricTotalCount) return;
   metricTotalCount.textContent = allTranscripts.length;
 
-  // Jami topshiriqlar va bajarilganlarini hisoblash
   let totalTasks = 0;
   let completedTasks = 0;
 
@@ -119,9 +115,7 @@ function updateMetrics() {
     const actions = item.action_items || [];
     totalTasks += actions.length;
     actions.forEach((_, idx) => {
-      if (item.completedActions && item.completedActions[idx]) {
-        completedTasks++;
-      }
+      if (item.completedActions && item.completedActions[idx]) completedTasks++;
     });
   });
 
@@ -130,30 +124,25 @@ function updateMetrics() {
   if (metricProgressBar) metricProgressBar.style.width = `${percent}%`;
 }
 
-// Ro'yxatni render qilish
+// Render
 function renderTranscripts() {
   if (!listContainer) return;
 
-  // Filtrlash
   let filtered = allTranscripts.filter(item => {
-    // Qidiruv filtri
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matchTitle = (item.title || '').toLowerCase().includes(q);
       const matchSummary = (item.summary || '').toLowerCase().includes(q);
       const matchTranscript = (item.full_transcript || '').toLowerCase().includes(q);
       const matchActions = (item.action_items || []).some(a => a.toLowerCase().includes(q));
-      if (!matchTitle && !matchSummary && !matchTranscript && !matchActions) {
-        return false;
-      }
+      if (!matchTitle && !matchSummary && !matchTranscript && !matchActions) return false;
     }
 
-    // Tab filtri
     if (activeFilter === 'with-tasks') {
       return (item.action_items && item.action_items.length > 0);
     }
-    if (activeFilter === 'uzbek') {
-      return (item.language || '').toLowerCase().includes("o'zbek");
+    if (activeFilter !== 'all') {
+      return (item.category === activeFilter);
     }
 
     return true;
@@ -170,14 +159,10 @@ function renderTranscripts() {
   }
 
   if (emptyStateView) emptyStateView.style.display = 'none';
-
   listContainer.innerHTML = filtered.map(item => createCardHTML(item)).join('');
-
-  // Hodisalarni ulash
   attachCardEvents();
 }
 
-// Bitta karta HTML kodini generatsiya qilish
 function createCardHTML(item) {
   const dateObj = new Date(item.date);
   const formattedDate = dateObj.toLocaleDateString('uz-UZ', {
@@ -189,6 +174,7 @@ function createCardHTML(item) {
 
   const actions = item.action_items || [];
   const hasActions = actions.length > 0;
+  const category = item.category || 'Umumiy';
 
   const actionsHTML = hasActions ? `
     <div class="card-actions-box">
@@ -209,12 +195,20 @@ function createCardHTML(item) {
     </div>
   ` : '';
 
+  const adviceHTML = item.answer_or_advice ? `
+    <div class="card-summary" style="border-left-color: var(--accent-indigo); margin-top: 10px;">
+      <div class="summary-heading" style="color: var(--accent-indigo);">💬 Javob / Maslahat</div>
+      <p class="summary-text">${escapeHTML(item.answer_or_advice)}</p>
+    </div>
+  ` : '';
+
   return `
     <article class="transcript-card" id="card-${item.id}">
       <div class="card-header">
         <div>
           <div class="card-tags">
             <span class="tag tag-time">📅 ${formattedDate}</span>
+            <span class="tag tag-cat">🏷️ ${category}</span>
             <span class="tag tag-lang">🌐 ${item.language || "O'zbekcha"}</span>
             <span class="tag tag-duration">⏱️ ${item.duration || '01:00'}</span>
           </div>
@@ -228,16 +222,14 @@ function createCardHTML(item) {
         </button>
       </div>
 
-      <!-- Xulosa -->
       <div class="card-summary">
         <div class="summary-heading">💡 Qisqacha Mazmun</div>
         <p class="summary-text">${escapeHTML(item.summary || "Xulosa yo'q.")}</p>
       </div>
 
-      <!-- Topshiriqlar ro'yxati -->
+      ${adviceHTML}
       ${actionsHTML}
 
-      <!-- To'liq transkripsiya akordeoni -->
       <div class="transcript-accordion">
         <button class="accordion-toggle" data-accordion-id="${item.id}">
           <span>📜 So'zma-so'z matnni ko'rish</span>
@@ -248,10 +240,12 @@ function createCardHTML(item) {
         </div>
       </div>
 
-      <!-- Karta pastki tugmalari -->
       <div class="card-footer">
+        <button class="card-btn btn-export-txt" data-export-id="${item.id}">
+          📄 TXT Yuklash
+        </button>
         <button class="card-btn btn-copy" data-copy-id="${item.id}">
-          📋 Xulosani nusxalash
+          📋 Nusxalash
         </button>
         <button class="card-btn btn-share" data-share-id="${item.id}">
           📤 Ulashish
@@ -261,14 +255,11 @@ function createCardHTML(item) {
   `;
 }
 
-// Hodisalarni ulash (Checkboxes, Accordions, Delete, Copy)
+// Hodisalarni ulash
 function attachCardEvents() {
-  // Checkbox bosilishi
   document.querySelectorAll('.action-item').forEach(label => {
     label.addEventListener('click', async (e) => {
-      // Input yoki label o'ziga bitta event bo'lishi uchun
       if (e.target.tagName !== 'INPUT') return;
-      
       const id = label.dataset.id;
       const index = parseInt(label.dataset.index, 10);
       triggerHaptic('light');
@@ -282,19 +273,16 @@ function attachCardEvents() {
         const json = await res.json();
         if (json.success) {
           const item = allTranscripts.find(t => t.id === id);
-          if (item) {
-            item.completedActions = json.data.completedActions;
-          }
+          if (item) item.completedActions = json.data.completedActions;
           label.classList.toggle('completed');
           updateMetrics();
         }
       } catch (err) {
-        console.error("Topshiriq holatini yangilashda xato:", err);
+        console.error("Xato:", err);
       }
     });
   });
 
-  // Akordeonni ochish / yopish
   document.querySelectorAll('.accordion-toggle').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.accordionId;
@@ -307,6 +295,31 @@ function attachCardEvents() {
     });
   });
 
+  // TXT yuklash
+  document.querySelectorAll('.btn-export-txt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.exportId;
+      const item = allTranscripts.find(t => t.id === id);
+      if (!item) return;
+
+      let content = `VOICEPROTOCOL AI — PROTOKOL\n`;
+      content += `Mavzu: ${item.title}\nSana: ${new Date(item.date).toLocaleString('uz-UZ')}\n\n`;
+      content += `QISQACHA MAZMUN:\n${item.summary}\n\n`;
+      if (item.action_items && item.action_items.length > 0) {
+        content += `TOPSHIRIQLAR:\n` + item.action_items.map((a, i) => `${i + 1}. ${a}`).join('\n') + `\n\n`;
+      }
+      content += `TO'LIQ TRANSKRIPSIYA:\n${item.full_transcript}\n`;
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${item.title.replace(/[^a-zA-Z0-9]/g, '_')}_protokol.txt`;
+      link.click();
+      showToast("Fayl yuklab olindi! 📄");
+      triggerHaptic('medium');
+    });
+  });
+
   // Nusxalash
   document.querySelectorAll('.btn-copy').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -314,17 +327,15 @@ function attachCardEvents() {
       const item = allTranscripts.find(t => t.id === id);
       if (!item) return;
 
-      let textToCopy = `📌 ${item.title}\n\n💡 QISQACHA MAZMUN:\n${item.summary}\n\n`;
+      let textToCopy = `📌 ${item.title}\n\n💡 Qisqacha mazmun:\n${item.summary}\n\n`;
       if (item.action_items && item.action_items.length > 0) {
-        textToCopy += `✅ TOPSHIRIQLAR:\n` + item.action_items.map((a, i) => `${i + 1}. ${a}`).join('\n') + `\n\n`;
+        textToCopy += `✅ Topshiriqlar:\n` + item.action_items.map((a, i) => `• ${a}`).join('\n') + `\n\n`;
       }
-      textToCopy += `📜 TO'LIQ MATN:\n${item.full_transcript}`;
+      textToCopy += `📜 To'liq matn:\n"${item.full_transcript}"`;
 
       navigator.clipboard.writeText(textToCopy).then(() => {
-        showToast("Protokol matni nusxalandi! 📋");
+        showToast("Protokol nusxalandi! 📋");
         triggerHaptic('medium');
-      }).catch(() => {
-        showToast("Nusxalash imkoni bo'lmadi");
       });
     });
   });
@@ -337,12 +348,8 @@ function attachCardEvents() {
       if (!item) return;
 
       const shareText = `📌 ${item.title}\n💡 Xulosa: ${item.summary}\n\nVoiceProtocol AI orqali tayyorlandi.`;
-      
       if (navigator.share) {
-        navigator.share({
-          title: item.title,
-          text: shareText
-        }).catch(() => {});
+        navigator.share({ title: item.title, text: shareText }).catch(() => {});
       } else {
         navigator.clipboard.writeText(shareText);
         showToast("Ulashish matni nusxalandi!");
@@ -373,116 +380,121 @@ function attachCardEvents() {
   });
 }
 
-// Xavfsiz matn
 function escapeHTML(str) {
   if (!str) return '';
   return str.replace(/[&<>'"]/g, 
-    tag => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      "'": '&#39;',
-      '"': '&quot;'
-    }[tag] || tag)
+    tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
   );
 }
 
-// Yangi namuna qo'shish (Tezkor test)
-function setupSimulator() {
-  const btnAdd = document.getElementById('btn-add-demo-sample');
-  if (btnAdd) {
-    btnAdd.addEventListener('click', async () => {
-      triggerHaptic('medium');
-      const sampleTopics = [
-        {
-          title: "Mobil ilova release & QA test rejalari",
-          language: "O'zbekcha",
-          duration: "03:12",
-          summary: "Yangi versiyadagi barcha xatolar (buglar) tekshirildi. Android va iOS platformalariga yangilanish yuborish vaqti belgilandi.",
-          action_items: [
-            "Bugungi release buildini test serveriga yuklash",
-            "To'lov integratsiyasini oxirgi marta qayta tekshirish",
-            "App Store va Play Market uchun skrinshotlarni tayyorlash"
-          ],
-          full_transcript: "Jamoa, yangilanish tayyor. QA barcha testlarni o'tkazdi. Ertaga ertalab soat 9:00 da yangi versiyani do'konlarga yuklaymiz. Hammaga rahmat!"
-        },
-        {
-          title: "Sotuv bo'limi haftalik tahlili",
-          language: "O'zbekcha / Ruscha",
-          duration: "02:40",
-          summary: "O'tgan haftada 45 ta yangi mijoz bilan shartnoma imzolandi. Konversiya 18% ga oshdi. Yangi CRM tizimiga o'tish taklif qilindi.",
-          action_items: [
-            "CRM tizimi tariflarini solishtirish",
-            "Sotuvchilarga yangi skriptlarni tarqatish"
-          ],
-          full_transcript: "Bu hafta yaxshi natija ko'rsatdik. Ayniqsa korporativ mijozlar soni oshdi. Keyingi haftadan yangi skriptlar bo'yicha qo'ng'iroqlarni boshlaymiz."
-        }
-      ];
+// Jonli Ovoz Yozish (Audio Recorder)
+function setupLiveRecorder() {
+  if (!recordMicBtn) return;
 
-      const chosen = sampleTopics[Math.floor(Math.random() * sampleTopics.length)];
+  recordMicBtn.addEventListener('click', async () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      // To'xtatish
+      stopRecording();
+    } else {
+      // Boshlash
+      startRecording();
+    }
+  });
 
-      try {
-        const res = await fetch('/api/transcripts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: 'demo',
-            ...chosen
-          })
-        });
-        const json = await res.json();
-        if (json.success) {
-          allTranscripts.unshift(json.data);
-          renderTranscripts();
-          updateMetrics();
-          showToast("Yangi konspekt qo'shildi! ⚡");
-          
-          // Yangi qo'shilgan kartaga scroll qilish
-          const newCard = document.getElementById(`card-${json.data.id}`);
-          if (newCard) {
-            newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }
-      } catch (err) {
-        showToast("Qo'shishda xatolik");
-      }
-    });
-  }
-
-  // Modal ko'rsatish
-  const btnGuide = document.getElementById('btn-open-bot-guide');
-  const modal = document.getElementById('guide-modal');
-  const closeBtn = document.getElementById('close-guide-modal-btn');
-  const gotItBtn = document.getElementById('btn-modal-got-it');
-
-  if (btnGuide && modal) {
-    btnGuide.addEventListener('click', () => {
-      modal.style.display = 'flex';
-      triggerHaptic('light');
-    });
-  }
-
-  const hideModal = () => {
-    if (modal) modal.style.display = 'none';
-  };
-
-  if (closeBtn) closeBtn.addEventListener('click', hideModal);
-  if (gotItBtn) gotItBtn.addEventListener('click', hideModal);
-  if (modal) {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) hideModal();
+  if (btnStopAnalyze) {
+    btnStopAnalyze.addEventListener('click', () => {
+      stopRecording();
     });
   }
 }
 
-// Qidiruv va filtrlar
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) audioChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      stream.getTracks().forEach(track => track.stop());
+
+      // Base64 ga o'girish
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async () => {
+        const base64Audio = reader.result.split(',')[1];
+        if (recordStatusText) recordStatusText.textContent = "AI tahlil qilmoqda...";
+
+        try {
+          const res = await fetch('/api/analyze-audio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              audioBase64: base64Audio,
+              mimeType: 'audio/webm',
+              title: `Jonli ovoz (${recordSeconds}s)`
+            })
+          });
+
+          const json = await res.json();
+          if (json.success) {
+            allTranscripts.unshift(json.data);
+            renderTranscripts();
+            updateMetrics();
+            showToast("Konspekt tayyor! ⚡");
+            triggerHaptic('heavy');
+          }
+        } catch (e) {
+          showToast("Tahlil qilishda xatolik");
+        } finally {
+          resetRecorderUI();
+        }
+      };
+    };
+
+    mediaRecorder.start();
+    recordMicBtn.classList.add('recording');
+    if (btnStopAnalyze) btnStopAnalyze.style.display = 'inline-flex';
+    if (recordStatusText) recordStatusText.textContent = "Yozilmoqda...";
+    recordSeconds = 0;
+    recordInterval = setInterval(() => {
+      recordSeconds++;
+      const mins = String(Math.floor(recordSeconds / 60)).padStart(2, '0');
+      const secs = String(recordSeconds % 60).padStart(2, '0');
+      if (recordTimerText) recordTimerText.textContent = `Vaqt: ${mins}:${secs}`;
+    }, 1000);
+
+    triggerHaptic('medium');
+  } catch (err) {
+    console.error("Mikrofon xatosi:", err);
+    showToast("Mikrofonga ruxsat berilmadi");
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
+  clearInterval(recordInterval);
+}
+
+function resetRecorderUI() {
+  recordMicBtn.classList.remove('recording');
+  if (btnStopAnalyze) btnStopAnalyze.style.display = 'none';
+  if (recordStatusText) recordStatusText.textContent = "Jonli ovoz yozish";
+  if (recordTimerText) recordTimerText.textContent = "Mikrofonni bosing va gapiring";
+}
+
+// Filtrlar
 function setupFilters() {
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
       searchQuery = e.target.value.trim();
-      if (clearSearchBtn) {
-        clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
-      }
+      if (clearSearchBtn) clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
       renderTranscripts();
     });
   }
@@ -507,10 +519,9 @@ function setupFilters() {
   });
 }
 
-// Dasturni ishga tushirish
 document.addEventListener('DOMContentLoaded', () => {
   initTelegram();
   setupFilters();
-  setupSimulator();
+  setupLiveRecorder();
   loadTranscripts();
 });

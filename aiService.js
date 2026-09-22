@@ -12,136 +12,168 @@ function getAIClient() {
 }
 
 /**
- * Audio faylni tahlil qilish (Transkripsiya + Xulosa + Topshiriqlar)
- * @param {Buffer} audioBuffer - Audio fayl buferi (.ogg, .mp3, .m4a, etc.)
- * @param {string} mimeType - Audio mime turi (masalan: audio/ogg)
- * @param {string} titleHint - Fayl nomi yoki dastlabki sarlavha
+ * Audio yoki Video faylni tahlil qilish (Transkripsiya + Xulosa + Topshiriqlar)
+ * @param {Buffer} mediaBuffer - Audio/Video fayl buferi
+ * @param {string} mimeType - Media turi (audio/ogg, video/mp4, audio/mpeg, etc.)
+ * @param {string} titleHint - Sarlavha
+ * @param {string} userLang - Foydalanuvchi tili (uz, ru, en)
  */
-export async function analyzeAudio(audioBuffer, mimeType = 'audio/ogg', titleHint = 'Ovozli xabar') {
+export async function analyzeMedia(mediaBuffer, mimeType = 'audio/ogg', titleHint = 'Ovozli xabar', userLang = 'uz') {
   const apiKey = process.env.GEMINI_API_KEY;
 
-  // Agar API kalit kiritilmagan bo'lsa, sinov uchun demo ma'lumot qaytaramiz
   if (!apiKey || apiKey.trim() === '' || apiKey.includes('YOUR_GEMINI_API_KEY')) {
-    console.warn('⚠️ GEMINI_API_KEY topilmadi! Demo rejimida namunaviy natija qaytarilmoqda.');
+    console.warn('⚠️ GEMINI_API_KEY topilmadi! Demo natija qaytarilmoqda.');
     return {
-      title: `${titleHint} (Demo Tahlil)`,
+      title: `${titleHint} (Demo)`,
       language: "O'zbekcha",
-      summary: "Ushbu ovozli xabarda yangi haftalik loyiha rejalari, dizayn talablari va server arxitekturasi muhokama qilindi. Jamoa a'zolariga tegishli vazifalar taqsimlandi.",
+      summary: "Ushbu xabarda loyiha talablari, vazifalar taqsimoti va navbatdagi qadamlar muhokama qilingan.",
       action_items: [
-        "Backend server va ma'lumotlar bazasi sxemasini yakunlash",
-        "Telegram Web App interfeysi dizaynini tasdiqlash",
-        "Juma kuniga qadar MVP test versiyasini taqdim etish"
+        "Loyiha rejasini jamoa bilan kelishish",
+        "Topshiriqlarni belgilangan muddatda yakunlash"
       ],
-      full_transcript: "Assalomu alaykum jamoa. Bugungi majlisimizda yangi startup loyihasini muhokama qilamiz. Hamma o'z vazifalarini vaqtida topshirishi kerak. Dizayn tayyor bo'lgach, frontend va botni ulaymiz. Rahmat hammaga!",
+      answer_or_advice: "",
+      full_transcript: "Assalomu alaykum. Reja bo'yicha ishlarni davom ettiramiz. Yangilanishlarni vaqtida sinab ko'ringlar. Rahmat!",
       isDemo: true
     };
   }
 
   const client = getAIClient();
-  const base64Data = audioBuffer.toString('base64');
+  const base64Data = mediaBuffer.toString('base64');
 
   const systemPrompt = `
-Siz o'ta aniq ishlaydigan professional audio transkriptor va nutq tahlilchisisiz.
-Sizga Telegram ovozli xabari yoki audio yozuv beriladi. Uni diqqat bilan tinglab, o'ta aniqlik bilan tahlil qiling.
+Siz o'ta aniq ishlaydigan professional transkriptor va nutq tahlilchisisiz.
+Sizga Telegram ovozli xabari, audio yoki dumaloq video xabar (krujochek) beriladi. Uni diqqat bilan eshitib/ko'rib, quyidagi talablar asosida tahlil qiling.
 
 MUHIM TALABLAR:
 1. TRANSKRIPSIYA (full_transcript):
-   - Audiodagi har bir so'zni 100% so'zma-so'z, aniq yozing.
-   - Hech qanday so'zni tushirib qoldirmang, o'zgartirmang va ortiqcha so'z qo'shmang!
+   - Har bir so'zni 100% so'zma-so'z, aniq yozing.
+   - Hech qanday so'zni tushirib qoldirmang, o'zgartirmang va ortiqcha so'z to'qimang!
    - So'zlashuv tili, sheva yoki jargonlarni aynan qanday aytilgan bo'lsa shunday yozing.
 
 2. QISQACHA MAZMUN (summary):
-   - Audioning asl mohiyatini 1-2 ta aniq va lo'nda gap bilan ifodalang.
-   - "Murojaatchi shuni aytmoqda", "Foydalanuvchi ma'lum qildi", "Ushbu xabarda" kabi keraksiz va quruq rasmiy so'zlarni UMUMAN ISHLATMANG! To'g'ridan-to'g'ri asosiy fikrni yozing.
+   - Asl mohiyatni 1-2 ta lo'nda, aniq gap bilan ifodalang.
+   - "Murojaatchi aytmoqda", "Foydalanuvchi ma'lum qildi" kabi quruq so'zlardan QAT'IYAN FOYDALANMANG! To'g'ridan-to'g'ri nima deyilgan bo'lsa, o'shani yozing.
 
 3. TOPSHIRIQLAR & VAZIFALAR (action_items):
-   - QAT'IY QOIDA: Faqat va faqat audioda kimgadir topshiriq berilgan, kelishuv qilingan yoki aniq reja aytilgan holatlardagina vazifani yozing!
-   - Agar audioda shunchaki savol so'ralgan bo'lsa, oddiy gaplashilgan yoki fikr bildirilgan bo'lsa, hech qanday vazifa TO'QIMANG va "action_items" massivini BO'SH [] qoldiring!
+   - QAT'IY QOIDA: Faqat audioda kimgadir topshiriq berilgan, kelishuv qilingan yoki reja aytilgan bo'lsa vazifani yozing!
+   - Agar shunchaki savol, salom-alik yoki oddiy gap bo'lsa, HECH QANDAY VAZIFA TO'QIMANG va "action_items" massivini BO'SH [] qoldiring!
 
 4. JAVOB / MASLAHAT (answer_or_advice):
-   - Agar gapiruvchi biror savol so'ragan yoki maslahat so'ragan bo'lsa (masalan, tibbiy, texnik yoki umumiy savol), unga qisqa, aniq va foydali maslahat/javob yozing.
-   - Agar savol bo'lmasa, bu maydonga bo'sh satr "" qoldiring.
+   - Agar gapiruvchi biror savol so'ragan yoki maslahat so'ragan bo'lsa (masalan, salomatlik, texnik, qanday qilish), unga qisqa, aniq va foydali javob yozing.
+   - Agar savol bo'lmasa, bo'sh satr "" qoldiring.
 
 JAVOBNI FAQAT QUYIDAGI VALID JSON FORMATIDA QAYTARING:
 {
-  "title": "Audioning aniq va qisqa sarlavhasi (2-4 so'z)",
+  "title": "Aniq va qisqa mavzu (2-4 so'z)",
   "language": "Audiodagi til (masalan: O'zbekcha)",
   "summary": "Ortiqcha so'zlarsiz, aniq va lo'nda xulosa",
   "action_items": [],
-  "answer_or_advice": "Savol bo'lsa qisqa javob, aks holda bo'sh qator",
-  "full_transcript": "Audiodagi so'zma-so'z to'liq matn"
+  "answer_or_advice": "",
+  "full_transcript": "So'zma-so'z to'liq matn"
 }
-Eslatma: Faqat toza JSON qaytaring, boshqa hech qanday izoh qo'shmang!
+`;
+
+  const modelsToTry = ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  let lastError = null;
+
+  for (const model of modelsToTry) {
+    try {
+      const response = await client.models.generateContent({
+        model,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: mimeType || 'audio/ogg',
+                  data: base64Data
+                }
+              },
+              {
+                text: systemPrompt
+              }
+            ]
+          }
+        ],
+        config: {
+          temperature: 0.2
+        }
+      });
+
+      const rawText = response.text ? response.text.trim() : '';
+      const cleanedJson = rawText
+        .replace(/^```json/i, '')
+        .replace(/^```/, '')
+        .replace(/```$/, '')
+        .trim();
+
+      try {
+        const parsed = JSON.parse(cleanedJson);
+        return {
+          title: parsed.title || titleHint,
+          language: parsed.language || "Aniqlanmadi",
+          summary: parsed.summary || "Xulosa mavjud emas.",
+          action_items: Array.isArray(parsed.action_items) ? parsed.action_items : [],
+          answer_or_advice: parsed.answer_or_advice || "",
+          full_transcript: parsed.full_transcript || rawText,
+          isDemo: false
+        };
+      } catch (jsonErr) {
+        return {
+          title: titleHint,
+          language: "Aniqlanmadi",
+          summary: rawText.slice(0, 250),
+          action_items: [],
+          answer_or_advice: "",
+          full_transcript: rawText,
+          isDemo: false
+        };
+      }
+    } catch (err) {
+      lastError = err;
+      console.warn(`Model ${model} xatosi:`, err.message);
+    }
+  }
+
+  throw lastError || new Error("Gemini javob bermadi");
+}
+
+// Qadimgi chaqiriqlar bilan moslik uchun
+export const analyzeAudio = analyzeMedia;
+
+/**
+ * Matnli xabarga aqlli AI javob qaytarish
+ * @param {string} userMessage - Foydalanuvchi yozgan savol yoki matn
+ * @param {string} contextInfo - Kontekst (masalan, oxirgi tahlil qilingan audio matni)
+ */
+export async function chatWithAI(userMessage, contextInfo = '') {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return "Assalomu alaykum! Men VoiceProtocol AI botiman. Menga ovozli xabar yoki dumaloq video (krujochek) yuborsangiz, uni bir zumda tahlil qilib beraman!";
+  }
+
+  const client = getAIClient();
+  const prompt = `
+Siz VoiceProtocol AI yordamchisisiz.
+Foydalanuvchi siz bilan muloqot qilmoqda.
+
+Kontekst: ${contextInfo ? `Oxirgi tahlil qilingan audio matni: "${contextInfo}"` : "Hali audio yuborilmadi."}
+
+Foydalanuvchi xabari: "${userMessage}"
+
+Vazifangiz: Foydalanuvchiga xushmuomala, lo'nda va foydali javob bering (o'zbek tilida). Agar audiodan biror narsa so'rayotgan bo'lsa, audiodagi ma'lumotlarga tayanib aniq javob bering. Ovozli xabar yoki krujochek yuborishi mumkinligini ham eslatib o'ting.
 `;
 
   try {
-    const modelsToTry = ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
-    let lastError = null;
-
-    for (const model of modelsToTry) {
-      try {
-        const response = await client.models.generateContent({
-          model,
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  inlineData: {
-                    mimeType: mimeType || 'audio/ogg',
-                    data: base64Data
-                  }
-                },
-                {
-                  text: systemPrompt
-                }
-              ]
-            }
-          ],
-          config: {
-            temperature: 0.2
-          }
-        });
-
-        const rawText = response.text ? response.text.trim() : '';
-        const cleanedJson = rawText
-          .replace(/^```json/i, '')
-          .replace(/^```/, '')
-          .replace(/```$/, '')
-          .trim();
-
-        try {
-          const parsed = JSON.parse(cleanedJson);
-          return {
-            title: parsed.title || titleHint,
-            language: parsed.language || "Aniqlanmadi",
-            summary: parsed.summary || "Xulosa mavjud emas.",
-            action_items: Array.isArray(parsed.action_items) ? parsed.action_items : [],
-            answer_or_advice: parsed.answer_or_advice || "",
-            full_transcript: parsed.full_transcript || rawText,
-            isDemo: false
-          };
-        } catch (jsonErr) {
-          return {
-            title: titleHint,
-            language: "Aniqlanmadi",
-            summary: rawText.slice(0, 250),
-            action_items: [],
-            answer_or_advice: "",
-            full_transcript: rawText,
-            isDemo: false
-          };
-        }
-      } catch (err) {
-        lastError = err;
-        console.warn(`Model ${model} bilan xatolik yuz berdi:`, err.message);
-        // Keyingi modelga o'tish
-      }
-    }
-
-    throw lastError || new Error("Gemini modellari javob bermadi");
-  } catch (error) {
-    console.error("AI tahlilida xatolik:", error);
-    throw error;
+    const response = await client.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: prompt,
+      config: { temperature: 0.5 }
+    });
+    return response.text ? response.text.trim() : "Tushundim. Menga istalgan ovozli xabar yuborsangiz, uni matnga aylantirib beraman!";
+  } catch (err) {
+    console.error("AI Chat xatolik:", err);
+    return "Kechirasiz, savolingizni tushunishda xatolik yuz berdi. Iltimos, ovozli xabar yoki krujochek yuborib ko'ring!";
   }
 }
