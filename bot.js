@@ -665,7 +665,7 @@ Biznes, SMM, marketing, IT, HR va sotuv sohalarida amaliy qo'llanadigan eng sara
     kb.text("⬅️ Barcha toifalar", "pr_cats_menu");
 
     const text = `
-${cat.icon} <b>${cat.name.toUpperCase()}</b> (${cat.count} ta prompt)
+${cat.icon} <b>${escapeHtml(cat.name.toUpperCase())}</b> (${cat.count} ta prompt)
 
 Qaysi bo'limdagi promptlarni ko'rmoqchisiz? Tanlang:
     `.trim();
@@ -688,16 +688,16 @@ Qaysi bo'limdagi promptlarni ko'rmoqchisiz? Tanlang:
     }
 
     const first = result.prompts[0];
-    let text = `📂 <b>${first.categoryIcon} ${first.categoryName}</b>\n`;
-    text += `🔹 <b>${first.subcategoryName}</b> (Jami: ${result.total} ta)\n`;
+    let text = `📂 <b>${first.categoryIcon} ${escapeHtml(first.categoryName)}</b>\n`;
+    text += `🔹 <b>${escapeHtml(first.subcategoryName)}</b> (Jami: ${result.total} ta)\n`;
     text += `📄 <i>Sahifa: ${result.page} / ${result.totalPages}</i>\n\n`;
 
     const kb = new InlineKeyboard();
 
     result.prompts.forEach((p, idx) => {
       const num = (result.page - 1) * limit + idx + 1;
-      text += `<b>${num}. ${p.title}</b>\n`;
-      text += `   📝 <i>${p.description.slice(0, 75)}...</i>\n\n`;
+      text += `<b>${num}. ${escapeHtml(p.title)}</b>\n`;
+      text += `   📝 <i>${escapeHtml(p.description.slice(0, 75))}...</i>\n\n`;
       kb.text(`👁️ ${num}. Ko'rish`, `pr_view_${p.id}`);
       if ((idx + 1) % 2 === 0 || idx === result.prompts.length - 1) {
         kb.row();
@@ -734,10 +734,10 @@ Qaysi bo'limdagi promptlarni ko'rmoqchisiz? Tanlang:
     const userId = ctx.from?.id;
     const isFav = isPromptFavorited(userId, p.id);
 
-    let text = `${p.categoryIcon} <b>${p.title}</b>\n\n`;
-    text += `📁 <b>Toifa:</b> ${p.categoryName} » ${p.subcategoryName}\n`;
-    text += `🎯 <b>Daraja:</b> <code>${p.difficulty}</code> | 🏷️ <i>#${p.tags.slice(0, 4).join(' #')}</i>\n`;
-    text += `💡 <b>Maqsad:</b> <i>${p.description}</i>\n\n`;
+    let text = `${p.categoryIcon} <b>${escapeHtml(p.title)}</b>\n\n`;
+    text += `📁 <b>Toifa:</b> ${escapeHtml(p.categoryName)} » ${escapeHtml(p.subcategoryName)}\n`;
+    text += `🎯 <b>Daraja:</b> <code>${escapeHtml(p.difficulty)}</code> | 🏷️ <i>#${p.tags.slice(0, 4).map(escapeHtml).join(' #')}</i>\n`;
+    text += `💡 <b>Maqsad:</b> <i>${escapeHtml(p.description)}</i>\n\n`;
     text += `📋 <b>AI PROMPT MATNI (Nusxa olish uchun bosing):</b>\n`;
     text += `<pre><code>${escapeHtml(p.prompt)}</code></pre>\n`;
     text += `<i>💡 Qavs ichidagi [Mavzu] kabi parametrlarni o'zingizga moslab o'zgartiring.</i>`;
@@ -762,7 +762,7 @@ Qaysi bo'limdagi promptlarni ko'rmoqchisiz? Tanlang:
     if (!p) return ctx.reply("⚠️ Prompt topilmadi.");
 
     const waitMsg = await ctx.reply(
-      `⚡ <b>"${p.title}"</b> bo'yicha sun'iy intellekt ishga tushirildi...\n<i>Gemini AI orqali natija tayyorlanmoqda...</i>`,
+      `⚡ <b>"${escapeHtml(p.title)}"</b> bo'yicha sun'iy intellekt ishga tushirildi...\n<i>Gemini AI orqali natija tayyorlanmoqda...</i>`,
       { parse_mode: 'HTML' }
     );
 
@@ -771,8 +771,7 @@ Qaysi bo'limdagi promptlarni ko'rmoqchisiz? Tanlang:
       const aiReply = await chatWithAI(p.prompt, `Soha: ${p.categoryName}, Yo'nalish: ${p.subcategoryName}`);
       try { await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch(e) {}
 
-      let resultText = `✨ <b>AI NATIJASI:</b>\n<i>(${p.title})</i>\n\n`;
-      resultText += aiReply;
+      let resultText = `✨ <b>AI NATIJASI:</b>\n<i>(${escapeHtml(p.title)})</i>\n\n${escapeHtml(aiReply)}`;
 
       if (resultText.length > 4000) {
         const chunks = [];
@@ -782,11 +781,19 @@ Qaysi bo'limdagi promptlarni ko'rmoqchisiz? Tanlang:
           curr = curr.slice(4000);
         }
         for (const ch of chunks) {
-          await ctx.reply(ch, { parse_mode: 'HTML' });
+          try {
+            await ctx.reply(ch, { parse_mode: 'HTML' });
+          } catch(e) {
+            await ctx.reply(ch);
+          }
         }
       } else {
         const kb = new InlineKeyboard().text("⬅️ Promptga qaytish", `pr_view_${p.id}`);
-        await ctx.reply(resultText, { parse_mode: 'HTML', reply_markup: kb });
+        try {
+          await ctx.reply(resultText, { parse_mode: 'HTML', reply_markup: kb });
+        } catch(e) {
+          await ctx.reply(`✨ AI NATIJASI:\n(${p.title})\n\n${aiReply}`, { reply_markup: kb });
+        }
       }
     } catch (err) {
       try { await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch(e) {}
@@ -811,7 +818,7 @@ Qaysi bo'limdagi promptlarni ko'rmoqchisiz? Tanlang:
     const kb = new InlineKeyboard();
 
     favs.slice(0, 10).forEach((p, idx) => {
-      text += `<b>${idx + 1}. ${p.categoryIcon} ${p.title}</b>\n`;
+      text += `<b>${idx + 1}. ${p.categoryIcon} ${escapeHtml(p.title)}</b>\n`;
       kb.text(`👁️ ${idx + 1}. Ko'rish`, `pr_view_${p.id}`);
       if ((idx + 1) % 2 === 0 || idx === favs.length - 1) kb.row();
     });
@@ -828,19 +835,19 @@ Qaysi bo'limdagi promptlarni ko'rmoqchisiz? Tanlang:
     const res = searchPrompts({ query, page: 1, limit: 6 });
     if (res.prompts.length === 0) {
       const kb = new InlineKeyboard().text("📂 Barcha toifalarni ko'rish", "pr_cats_menu");
-      return ctx.reply(`🔍 <b>"${query}"</b> bo'yicha hech qanday prompt topilmadi.\nBoshqa kalit so'z bilan izlab ko'ring (masalan: <i>reels, sotuv, target, pitching, rezyume</i>).`, {
+      return ctx.reply(`🔍 <b>"${escapeHtml(query)}"</b> bo'yicha hech qanday prompt topilmadi.\nBoshqa kalit so'z bilan izlab ko'ring (masalan: <i>reels, sotuv, target, pitching, rezyume</i>).`, {
         parse_mode: 'HTML',
         reply_markup: kb
       });
     }
 
-    let text = `🔍 <b>"${query}" BO'YICHA QIDIRUV NATIJALARI:</b>\n`;
+    let text = `🔍 <b>"${escapeHtml(query)}" BO'YICHA QIDIRUV NATIJALARI:</b>\n`;
     text += `<i>Topildi: ${res.total} ta prompt (dastlabki 6 tasi):</i>\n\n`;
 
     const kb = new InlineKeyboard();
     res.prompts.forEach((p, idx) => {
-      text += `<b>${idx + 1}. ${p.categoryIcon} ${p.title}</b>\n`;
-      text += `   <i>📁 ${p.categoryName} » ${p.subcategoryName}</i>\n\n`;
+      text += `<b>${idx + 1}. ${p.categoryIcon} ${escapeHtml(p.title)}</b>\n`;
+      text += `   <i>📁 ${escapeHtml(p.categoryName)} » ${escapeHtml(p.subcategoryName)}</i>\n\n`;
       kb.text(`👁️ ${idx + 1}. Ko'rish`, `pr_view_${p.id}`);
       if ((idx + 1) % 2 === 0 || idx === res.prompts.length - 1) kb.row();
     });
