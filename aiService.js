@@ -41,25 +41,37 @@ export async function analyzeAudio(audioBuffer, mimeType = 'audio/ogg', titleHin
   const base64Data = audioBuffer.toString('base64');
 
   const systemPrompt = `
-Siz professional audio tahlilchi va majlis protokollarini tuzuvchi sun'iy intellektsiz.
-Sizga Telegram ovozli xabari yoki audio fayl beriladi. Siz uni diqqat bilan eshitib:
-1. Audioda aytilgan so'zma-so'z matnni (transkripsiya) aniqlang (o'zbek, rus, ingliz yoki aralash so'zlashuv bo'lsa ham to'g'ri yozing).
-2. Qisqacha mazmun (Xulosa / TL;DR) chiqaring.
-3. Barcha aytilgan topshiriqlar, kelishuvlar yoki harakatlar ro'yxatini (Action items / To-Do) aniqlang.
-4. Mos sarlavha tanlang.
+Siz o'ta aniq ishlaydigan professional audio transkriptor va nutq tahlilchisisiz.
+Sizga Telegram ovozli xabari yoki audio yozuv beriladi. Uni diqqat bilan tinglab, o'ta aniqlik bilan tahlil qiling.
+
+MUHIM TALABLAR:
+1. TRANSKRIPSIYA (full_transcript):
+   - Audiodagi har bir so'zni 100% so'zma-so'z, aniq yozing.
+   - Hech qanday so'zni tushirib qoldirmang, o'zgartirmang va ortiqcha so'z qo'shmang!
+   - So'zlashuv tili, sheva yoki jargonlarni aynan qanday aytilgan bo'lsa shunday yozing.
+
+2. QISQACHA MAZMUN (summary):
+   - Audioning asl mohiyatini 1-2 ta aniq va lo'nda gap bilan ifodalang.
+   - "Murojaatchi shuni aytmoqda", "Foydalanuvchi ma'lum qildi", "Ushbu xabarda" kabi keraksiz va quruq rasmiy so'zlarni UMUMAN ISHLATMANG! To'g'ridan-to'g'ri asosiy fikrni yozing.
+
+3. TOPSHIRIQLAR & VAZIFALAR (action_items):
+   - QAT'IY QOIDA: Faqat va faqat audioda kimgadir topshiriq berilgan, kelishuv qilingan yoki aniq reja aytilgan holatlardagina vazifani yozing!
+   - Agar audioda shunchaki savol so'ralgan bo'lsa, oddiy gaplashilgan yoki fikr bildirilgan bo'lsa, hech qanday vazifa TO'QIMANG va "action_items" massivini BO'SH [] qoldiring!
+
+4. JAVOB / MASLAHAT (answer_or_advice):
+   - Agar gapiruvchi biror savol so'ragan yoki maslahat so'ragan bo'lsa (masalan, tibbiy, texnik yoki umumiy savol), unga qisqa, aniq va foydali maslahat/javob yozing.
+   - Agar savol bo'lmasa, bu maydonga bo'sh satr "" qoldiring.
 
 JAVOBNI FAQAT QUYIDAGI VALID JSON FORMATIDA QAYTARING:
 {
-  "title": "Qisqa va aniq sarlavha (masalan: Marketing majlisi yoki Loyiha topshiriqlari)",
-  "language": "Audioda gapirilgan til (masalan: O'zbekcha, Ruscha, Inglizcha)",
-  "summary": "Audio haqida 2-4 gapdan iborat qisqacha asosiy xulosa",
-  "action_items": [
-    "1-vazifa yoki kelishuv",
-    "2-vazifa..."
-  ],
-  "full_transcript": "Audiodagi gaplarning to'liq, so'zma-so'z matni"
+  "title": "Audioning aniq va qisqa sarlavhasi (2-4 so'z)",
+  "language": "Audiodagi til (masalan: O'zbekcha)",
+  "summary": "Ortiqcha so'zlarsiz, aniq va lo'nda xulosa",
+  "action_items": [],
+  "answer_or_advice": "Savol bo'lsa qisqa javob, aks holda bo'sh qator",
+  "full_transcript": "Audiodagi so'zma-so'z to'liq matn"
 }
-Eslatma: Faqat JSON qaytaring, boshqa hech qanday belgi yoki kirish so'zi qo'shmang!
+Eslatma: Faqat toza JSON qaytaring, boshqa hech qanday izoh qo'shmang!
 `;
 
   try {
@@ -85,11 +97,13 @@ Eslatma: Faqat JSON qaytaring, boshqa hech qanday belgi yoki kirish so'zi qo'shm
                 }
               ]
             }
-          ]
+          ],
+          config: {
+            temperature: 0.2
+          }
         });
 
         const rawText = response.text ? response.text.trim() : '';
-        // JSON tozalash (agar markdown ```json ... ``` bilan o'ralgan bo'lsa)
         const cleanedJson = rawText
           .replace(/^```json/i, '')
           .replace(/^```/, '')
@@ -103,16 +117,17 @@ Eslatma: Faqat JSON qaytaring, boshqa hech qanday belgi yoki kirish so'zi qo'shm
             language: parsed.language || "Aniqlanmadi",
             summary: parsed.summary || "Xulosa mavjud emas.",
             action_items: Array.isArray(parsed.action_items) ? parsed.action_items : [],
+            answer_or_advice: parsed.answer_or_advice || "",
             full_transcript: parsed.full_transcript || rawText,
             isDemo: false
           };
         } catch (jsonErr) {
-          // Agar JSON parse bo'lmasa, umumiy matn sifatida qaytaramiz
           return {
             title: titleHint,
             language: "Aniqlanmadi",
-            summary: rawText.slice(0, 300) + '...',
+            summary: rawText.slice(0, 250),
             action_items: [],
+            answer_or_advice: "",
             full_transcript: rawText,
             isDemo: false
           };

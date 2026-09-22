@@ -155,35 +155,33 @@ Majlis yoki darslarda suhbatni ovozli xabar qilib botga tashlasangiz, kim qanday
         // e'tiborsiz qoldirish
       }
 
-      // Xabarni chiroyli formatlash
-      let messageText = `✨ <b>${result.title}</b>\n`;
-      messageText += `🌐 <i>Til: ${result.language} | ⏱️ Davomiyligi: ${durationStr}</i>\n\n`;
+      // Xabarni toza va aniq formatlash
+      let messageText = `📌 <b>${result.title}</b>\n\n`;
       
-      messageText += `💡 <b>QISQACHA MAZMUN:</b>\n${result.summary}\n\n`;
+      messageText += `💡 <b>Xulosa:</b>\n${result.summary}\n\n`;
 
       if (result.action_items && result.action_items.length > 0) {
-        messageText += `✅ <b>TOPSHIRIQLAR & VAZIFALAR:</b>\n`;
-        result.action_items.forEach((item, idx) => {
-          messageText += `  ${idx + 1}. ${item}\n`;
+        messageText += `✅ <b>Vazifalar & Topshiriqlar:</b>\n`;
+        result.action_items.forEach((item) => {
+          messageText += `• ${item}\n`;
         });
         messageText += `\n`;
       }
 
-      messageText += `📜 <b>TO'LIQ TRANSKRIPSIYA:</b>\n<i>${result.full_transcript}</i>\n`;
-
-      if (result.isDemo) {
-        messageText += `\n⚠️ <i>(Eslatma: Bu demo tahlil natijasi. Haqiqiy AI ovoz tahlili uchun .env faylida GEMINI_API_KEY ko'rsating)</i>`;
+      if (result.answer_or_advice && result.answer_or_advice.trim() !== '') {
+        messageText += `💬 <b>Javob / Maslahat:</b>\n${result.answer_or_advice}\n\n`;
       }
+
+      messageText += `📜 <b>So'zma-so'z matn:</b>\n<i>"${result.full_transcript}"</i>`;
 
       const itemKeyboard = new InlineKeyboard();
       if (webappUrl && webappUrl.startsWith('https://')) {
-        itemKeyboard.webApp('🌐 Web App\'da ochish', `${webappUrl}?item=${savedItem.id}`).row();
+        itemKeyboard.webApp('🌐 Web App\'da ochish', `${webappUrl}?item=${savedItem.id}`);
       }
-      itemKeyboard.text('📋 Vazifalar ro\'yxati', `show_actions_${savedItem.id}`);
 
       await ctx.reply(messageText, {
         parse_mode: 'HTML',
-        reply_markup: itemKeyboard
+        reply_markup: itemKeyboard.inline_keyboard.length > 0 ? itemKeyboard : undefined
       });
 
     } catch (error) {
