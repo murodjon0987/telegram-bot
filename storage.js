@@ -8,6 +8,8 @@ const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'transcripts.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const GROUPS_FILE = path.join(DATA_DIR, 'groups.json');
+const PROMPTS_FILE = path.join(DATA_DIR, 'prompts.json');
+const FAVORITES_FILE = path.join(DATA_DIR, 'favorites.json');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -64,10 +66,17 @@ export function saveTranscript(data) {
     category = 'Moliya';
   }
 
-  // Hisoblangan statistika (so'zlar soni va WPM)
+  // Hisoblangan statistika (so'zlar soni va tejalgan vaqt)
   const fullText = data.full_transcript || '';
   const wordsCount = fullText.trim() ? fullText.trim().split(/\s+/).length : 0;
-  const readingTimeSec = Math.max(1, Math.round(wordsCount / 2.5)); // o'rtacha 150 wpm
+  const readingTimeSec = Math.max(3, Math.round(wordsCount / 3.5)); // ~210 wpm o'qish
+
+  let audioDurationSec = 30;
+  if (data.duration && data.duration.includes(':')) {
+    const [m, s] = data.duration.split(':').map(Number);
+    audioDurationSec = (m || 0) * 60 + (s || 0);
+  }
+  const timeSavedSec = Math.max(0, audioDurationSec - readingTimeSec);
 
   const newItem = {
     id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
@@ -75,6 +84,7 @@ export function saveTranscript(data) {
     category,
     wordsCount,
     readingTimeSec,
+    timeSavedSec,
     isCompleted: false,
     completedActions: {},
     ...data
@@ -84,7 +94,7 @@ export function saveTranscript(data) {
   safeWrite(DATA_FILE, items);
 
   if (data.userId) {
-    incrementUserAudioCount(data.userId);
+    incrementUserAudioCount(data.userId, timeSavedSec);
   }
 
   return newItem;
@@ -176,12 +186,23 @@ export function getAllUsers() {
   return safeRead(USERS_FILE, []);
 }
 
-function incrementUserAudioCount(userId) {
+const QUIZ_CACHE = new Map();
+
+export function setCachedQuiz(userId, quizData) {
+  QUIZ_CACHE.set(String(userId), quizData);
+}
+
+export function getCachedQuiz(userId) {
+  return QUIZ_CACHE.get(String(userId)) || null;
+}
+
+function incrementUserAudioCount(userId, timeSavedSec = 0) {
   const users = safeRead(USERS_FILE, []);
   const user = users.find(u => u.id === String(userId));
   if (user) {
     user.audioCount = (user.audioCount || 0) + 1;
-    user.points = (user.points || 0) + 1; // Har bir audio uchun 1 ball
+    user.points = (user.points || 0) + 1;
+    user.totalTimeSavedSec = (user.totalTimeSavedSec || 0) + timeSavedSec;
     safeWrite(USERS_FILE, users);
   }
 }
@@ -237,3 +258,129 @@ export function getSystemStats() {
     taskCompletionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 100
   };
 }
+
+// ==========================================
+// 💡 4,000 TA AI PROMPTLAR VA SHABLONLAR MODULI
+// ==========================================
+
+let CACHED_PROMPTS = null;
+
+export function getAllPrompts() {
+  if (!CACHED_PROMPTS) {
+    CACHED_PROMPTS = safeRead(PROMPTS_FILE, []);
+  }
+  return CACHED_PROMPTS;
+}
+
+export function getPromptCategories() {
+  const prompts = getAllPrompts();
+  const categoryMap = new Map();
+
+  prompts.forEach(p => {
+    if (!categoryMap.has(p.categoryId)) {
+      categoryMap.set(p.categoryId, {
+        id: p.categoryId,
+        name: p.categoryName,
+        icon: p.categoryIcon,
+        count: 0,
+        subcategories: new Set()
+      });
+    }
+    const cat = categoryMap.get(p.categoryId);
+    cat.count++;
+    cat.subcategories.add(JSON.stringify({ name: p.subcategoryName, tag: p.subcategoryTag }));
+  });
+
+  return Array.from(categoryMap.values()).map(c => ({
+    ...c,
+    subcategories: Array.from(c.subcategories).map(s => JSON.parse(s))
+  }));
+}
+
+export function searchPrompts({ query = '', categoryId = null, subcategoryTag = null, page = 1, limit = 10 } = {}) {
+  const prompts = getAllPrompts();
+  const q = (query || '').toLowerCase().trim();
+
+  let filtered = prompts.filter(p => {
+    if (categoryId && p.categoryId !== categoryId) return false;
+    if (subcategoryTag && p.subcategoryTag !== subcategoryTag) return false;
+
+    if (q) {
+      const inTitle = p.title.toLowerCase().includes(q);
+      const inDesc = p.description.toLowerCase().includes(q);
+      const inPrompt = p.prompt.toLowerCase().includes(q);
+      const inTags = (p.tags || []).some(t => t.toLowerCase().includes(q));
+      const inSub = p.subcategoryName.toLowerCase().includes(q);
+      return inTitle || inDesc || inPrompt || inTags || inSub;
+    }
+    return true;
+  });
+
+  const total = filtered.length;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
+  const totalPages = Math.ceil(total / limitNum) || 1;
+  const startIndex = (pageNum - 1) * limitNum;
+  const pagedPrompts = filtered.slice(startIndex, startIndex + limitNum);
+
+  return {
+    total,
+    page: pageNum,
+    limit: limitNum,
+    totalPages,
+    prompts: pagedPrompts
+  };
+}
+
+export function getPromptById(id) {
+  const prompts = getAllPrompts();
+  const numId = parseInt(id, 10);
+  return prompts.find(p => p.id === numId) || null;
+}
+
+export function getRandomPrompt(categoryId = null) {
+  const prompts = getAllPrompts();
+  const pool = categoryId ? prompts.filter(p => p.categoryId === categoryId) : prompts;
+  if (pool.length === 0) return null;
+  const idx = Math.floor(Math.random() * pool.length);
+  return pool[idx];
+}
+
+// Sevimlilar (Favorites)
+export function getUserFavorites(userId) {
+  if (!userId) return [];
+  const favs = safeRead(FAVORITES_FILE, {});
+  const userFavIds = favs[String(userId)] || [];
+  const prompts = getAllPrompts();
+  return prompts.filter(p => userFavIds.includes(p.id));
+}
+
+export function toggleFavoritePrompt(userId, promptId) {
+  if (!userId || !promptId) return false;
+  const favs = safeRead(FAVORITES_FILE, {});
+  const uid = String(userId);
+  const pid = parseInt(promptId, 10);
+
+  if (!favs[uid]) favs[uid] = [];
+
+  const existsIdx = favs[uid].indexOf(pid);
+  let isFavorited = false;
+  if (existsIdx > -1) {
+    favs[uid].splice(existsIdx, 1);
+    isFavorited = false;
+  } else {
+    favs[uid].push(pid);
+    isFavorited = true;
+  }
+
+  safeWrite(FAVORITES_FILE, favs);
+  return { isFavorited, count: favs[uid].length };
+}
+
+export function isPromptFavorited(userId, promptId) {
+  if (!userId || !promptId) return false;
+  const favs = safeRead(FAVORITES_FILE, {});
+  const list = favs[String(userId)] || [];
+  return list.includes(parseInt(promptId, 10));
+}
+

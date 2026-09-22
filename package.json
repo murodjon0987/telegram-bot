@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "bot": "node bot.js"
+    "bot": "node bot.js",
+    "generate-prompts": "node scripts/generatePrompts.js"
   },
   "keywords": ["telegram", "bot", "ai", "transcribe", "summary", "uzbek"],
   "author": "",

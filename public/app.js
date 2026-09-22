@@ -519,9 +519,454 @@ function setupFilters() {
   });
 }
 
+// ==========================================
+// 💡 4,000 TA AI PROMPTLAR VA SHABLONLAR WEBAPP
+// ==========================================
+
+let promptCategories = [];
+let currentPromptCat = 'all';
+let currentPromptPage = 1;
+let promptSearchQuery = '';
+let isFavsOnly = false;
+let userFavIds = new Set(JSON.parse(localStorage.getItem('vp_fav_prompts') || '[]'));
+let currentModalPrompt = null;
+let promptDebounceTimer = null;
+
+// DOM
+const tabBtnTranscripts = document.getElementById('tab-btn-transcripts');
+const tabBtnPrompts = document.getElementById('tab-btn-prompts');
+const viewTranscripts = document.getElementById('view-transcripts');
+const viewPrompts = document.getElementById('view-prompts');
+
+const promptSearchInput = document.getElementById('prompt-search-input');
+const clearPromptSearchBtn = document.getElementById('clear-prompt-search-btn');
+const btnRandomPrompt = document.getElementById('btn-random-prompt');
+const btnFavoritesToggle = document.getElementById('btn-favorites-toggle');
+const favCountBadge = document.getElementById('fav-count-badge');
+const promptCategoriesContainer = document.getElementById('prompt-categories-container');
+const promptsGridContainer = document.getElementById('prompts-grid-container');
+const promptsCounterBadge = document.getElementById('prompts-counter-badge');
+const promptsPagination = document.getElementById('prompts-pagination');
+const btnPrevPage = document.getElementById('btn-prev-page');
+const btnNextPage = document.getElementById('btn-next-page');
+const pageIndicatorText = document.getElementById('page-indicator-text');
+
+// Modal DOM
+const promptModalOverlay = document.getElementById('prompt-modal-overlay');
+const btnCloseModal = document.getElementById('btn-close-modal');
+const modalPromptIcon = document.getElementById('modal-prompt-icon');
+const modalPromptTitle = document.getElementById('modal-prompt-title');
+const modalPromptMeta = document.getElementById('modal-prompt-meta');
+const modalPromptDesc = document.getElementById('modal-prompt-desc');
+const modalPromptText = document.getElementById('modal-prompt-text');
+const btnCopyModalPrompt = document.getElementById('btn-copy-modal-prompt');
+const btnUseModalPrompt = document.getElementById('btn-use-modal-prompt');
+
+function switchTab(tab) {
+  triggerHaptic('selection');
+  if (tab === 'prompts') {
+    tabBtnTranscripts?.classList.remove('active');
+    tabBtnPrompts?.classList.add('active');
+    if (viewTranscripts) viewTranscripts.style.display = 'none';
+    if (viewPrompts) viewPrompts.style.display = 'block';
+
+    if (promptCategories.length === 0) {
+      loadPromptCategories();
+    }
+    loadPrompts();
+  } else {
+    tabBtnPrompts?.classList.remove('active');
+    tabBtnTranscripts?.classList.add('active');
+    if (viewPrompts) viewPrompts.style.display = 'none';
+    if (viewTranscripts) viewTranscripts.style.display = 'block';
+  }
+}
+
+async function loadPromptCategories() {
+  try {
+    const res = await fetch('/api/prompts/categories');
+    const json = await res.json();
+    if (json.success) {
+      promptCategories = json.data;
+      renderPromptCategories();
+    }
+  } catch (e) {
+    console.error("Toifalarni yuklashda xato:", e);
+  }
+}
+
+function renderPromptCategories() {
+  if (!promptCategoriesContainer) return;
+
+  let totalCount = 4000;
+  let html = `<button class="cat-pill ${currentPromptCat === 'all' ? 'active' : ''}" data-cat="all">🌟 Barchasi (${totalCount})</button>`;
+
+  promptCategories.forEach(cat => {
+    const isActive = (currentPromptCat === cat.id);
+    html += `<button class="cat-pill ${isActive ? 'active' : ''}" data-cat="${cat.id}">
+      ${cat.icon} ${cat.name.split('&')[0].trim()} (${cat.count})
+    </button>`;
+  });
+
+  promptCategoriesContainer.innerHTML = html;
+
+  promptCategoriesContainer.querySelectorAll('.cat-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      triggerHaptic('selection');
+      promptCategoriesContainer.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentPromptCat = btn.dataset.cat;
+      currentPromptPage = 1;
+      loadPrompts();
+    });
+  });
+}
+
+async function loadPrompts() {
+  if (!promptsGridContainer) return;
+
+  promptsGridContainer.innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>4,000 ta AI promptlar bazasidan qidirilmoqda...</p>
+    </div>
+  `;
+
+  try {
+    let url = `/api/prompts?page=${currentPromptPage}&limit=15`;
+    if (currentPromptCat !== 'all') {
+      url += `&category=${encodeURIComponent(currentPromptCat)}`;
+    }
+    if (promptSearchQuery) {
+      url += `&query=${encodeURIComponent(promptSearchQuery)}`;
+    }
+
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (json.success) {
+      renderPrompts(json);
+    } else {
+      promptsGridContainer.innerHTML = `<div class="empty-state"><p>Promptlarni yuklab bo'lmadi.</p></div>`;
+    }
+  } catch (err) {
+    console.error("Promptlarni yuklash xatosi:", err);
+    promptsGridContainer.innerHTML = `<div class="empty-state"><p>Xatolik: ${err.message}</p></div>`;
+  }
+}
+
+function renderPrompts(data) {
+  if (!promptsGridContainer) return;
+
+  let list = data.prompts || [];
+
+  if (isFavsOnly) {
+    list = list.filter(p => userFavIds.has(p.id));
+  }
+
+  if (promptsCounterBadge) {
+    promptsCounterBadge.textContent = `${data.total.toLocaleString()} ta`;
+  }
+
+  if (favCountBadge) {
+    favCountBadge.textContent = userFavIds.size;
+  }
+
+  if (list.length === 0) {
+    promptsGridContainer.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>Hech qanday prompt topilmadi</h3>
+        <p>${promptSearchQuery ? `"${promptSearchQuery}" bo'yicha hech narsa chiqmadi. Boshqa so'z bilan qidiring.` : 'Bu toifada promptlar yo\'q.'}</p>
+      </div>
+    `;
+    if (promptsPagination) promptsPagination.style.display = 'none';
+    return;
+  }
+
+  let html = '';
+  list.forEach(p => {
+    const isFav = userFavIds.has(p.id);
+    const diffClass = (p.difficulty === 'Boshlang\'ich') ? 'diff-boshlangich' : (p.difficulty === 'Ekspert') ? 'diff-ekspert' : 'diff-orta';
+
+    html += `
+      <div class="prompt-card" data-prompt-id="${p.id}">
+        <div class="prompt-card-top">
+          <span class="prompt-category-badge">${p.categoryIcon} ${p.subcategoryName}</span>
+          <span class="prompt-difficulty-badge ${diffClass}">${p.difficulty}</span>
+        </div>
+        <h3 class="prompt-card-title">${escapeHtml(p.title)}</h3>
+        <p class="prompt-card-desc">${escapeHtml(p.description)}</p>
+        
+        <div class="prompt-code-preview" title="To'liq o'qish uchun bosing">
+          <code>${escapeHtml(p.prompt)}</code>
+        </div>
+
+        <div class="prompt-card-footer">
+          <div class="prompt-tags-list">
+            ${(p.tags || []).slice(0, 3).map(t => `<span class="prompt-tag-item">#${escapeHtml(t)}</span>`).join(' ')}
+          </div>
+          <div class="prompt-card-actions">
+            <button class="btn-card-action btn-copy-prompt" data-prompt-id="${p.id}" title="Nusxalash">
+              📋 Nusxa
+            </button>
+            <button class="btn-card-action btn-fav-prompt ${isFav ? 'fav-active' : ''}" data-prompt-id="${p.id}" title="Sevimlilarga qo'shish">
+              ${isFav ? '⭐' : '☆'}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  promptsGridContainer.innerHTML = html;
+
+  // Pagination ko'rsatish
+  if (promptsPagination) {
+    if (data.totalPages > 1) {
+      promptsPagination.style.display = 'flex';
+      if (pageIndicatorText) {
+        pageIndicatorText.textContent = `Sahifa ${data.page} / ${data.totalPages}`;
+      }
+      if (btnPrevPage) btnPrevPage.disabled = (data.page <= 1);
+      if (btnNextPage) btnNextPage.disabled = (data.page >= data.totalPages);
+    } else {
+      promptsPagination.style.display = 'none';
+    }
+  }
+
+  // Card click eventlari
+  promptsGridContainer.querySelectorAll('.prompt-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-copy-prompt') || e.target.closest('.btn-fav-prompt')) return;
+      const id = parseInt(card.dataset.promptId, 10);
+      const found = list.find(x => x.id === id);
+      if (found) openPromptModal(found);
+    });
+  });
+
+  // Nusxalash
+  promptsGridContainer.querySelectorAll('.btn-copy-prompt').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.promptId, 10);
+      const found = list.find(x => x.id === id);
+      if (found) {
+        copyPromptText(found.prompt);
+      }
+    });
+  });
+
+  // Sevimlilar
+  promptsGridContainer.querySelectorAll('.btn-fav-prompt').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.promptId, 10);
+      togglePromptFavorite(id, btn);
+    });
+  });
+}
+
+function openPromptModal(prompt) {
+  currentModalPrompt = prompt;
+  if (!promptModalOverlay) return;
+
+  if (modalPromptIcon) modalPromptIcon.textContent = prompt.categoryIcon;
+  if (modalPromptTitle) modalPromptTitle.textContent = prompt.title;
+  if (modalPromptMeta) {
+    modalPromptMeta.innerHTML = `
+      <span class="prompt-category-badge">${prompt.categoryIcon} ${prompt.categoryName} » ${prompt.subcategoryName}</span>
+      <span class="prompt-difficulty-badge diff-orta">${prompt.difficulty}</span>
+    `;
+  }
+  if (modalPromptDesc) modalPromptDesc.textContent = prompt.description;
+  if (modalPromptText) modalPromptText.textContent = prompt.prompt;
+
+  promptModalOverlay.style.display = 'flex';
+  triggerHaptic('medium');
+}
+
+function closePromptModal() {
+  if (promptModalOverlay) promptModalOverlay.style.display = 'none';
+  currentModalPrompt = null;
+}
+
+function togglePromptFavorite(promptId, btnElem = null) {
+  triggerHaptic('selection');
+  if (userFavIds.has(promptId)) {
+    userFavIds.delete(promptId);
+    showToast("❌ Sevimlilardan olib tashlandi");
+    if (btnElem) {
+      btnElem.classList.remove('fav-active');
+      btnElem.innerHTML = '☆';
+    }
+  } else {
+    userFavIds.add(promptId);
+    showToast("⭐ Sevimli ro'yxatga saqlandi!");
+    if (btnElem) {
+      btnElem.classList.add('fav-active');
+      btnElem.innerHTML = '⭐';
+    }
+  }
+
+  localStorage.setItem('vp_fav_prompts', JSON.stringify(Array.from(userFavIds)));
+  if (favCountBadge) favCountBadge.textContent = userFavIds.size;
+}
+
+function copyPromptText(text) {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast("📋 AI Prompt nusxalandi! Chatga qo'yib ishlatishingiz mumkin.");
+    triggerHaptic('success');
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast("📋 AI Prompt nusxalandi!");
+    triggerHaptic('success');
+  });
+}
+
+async function fetchRandomPrompt() {
+  triggerHaptic('medium');
+  try {
+    let url = '/api/prompts/random';
+    if (currentPromptCat !== 'all') {
+      url += `?category=${encodeURIComponent(currentPromptCat)}`;
+    }
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.success && json.data) {
+      openPromptModal(json.data);
+    }
+  } catch (e) {
+    showToast("⚠️ Promptni yuklab bo'lmadi");
+  }
+}
+
+function setupPromptsUI() {
+  // Tab tugmalari
+  if (tabBtnTranscripts) {
+    tabBtnTranscripts.addEventListener('click', () => switchTab('transcripts'));
+  }
+  if (tabBtnPrompts) {
+    tabBtnPrompts.addEventListener('click', () => switchTab('prompts'));
+  }
+
+  // URL parametridan tabni tekshirish
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('tab') === 'prompts') {
+    switchTab('prompts');
+  }
+
+  // Qidiruv
+  if (promptSearchInput) {
+    promptSearchInput.addEventListener('input', (e) => {
+      clearTimeout(promptDebounceTimer);
+      const val = e.target.value.trim();
+      if (clearPromptSearchBtn) clearPromptSearchBtn.style.display = val ? 'block' : 'none';
+      
+      promptDebounceTimer = setTimeout(() => {
+        promptSearchQuery = val;
+        currentPromptPage = 1;
+        loadPrompts();
+      }, 350);
+    });
+  }
+
+  if (clearPromptSearchBtn) {
+    clearPromptSearchBtn.addEventListener('click', () => {
+      if (promptSearchInput) promptSearchInput.value = '';
+      promptSearchQuery = '';
+      clearPromptSearchBtn.style.display = 'none';
+      currentPromptPage = 1;
+      loadPrompts();
+    });
+  }
+
+  // Tasodifiy prompt
+  if (btnRandomPrompt) {
+    btnRandomPrompt.addEventListener('click', fetchRandomPrompt);
+  }
+
+  // Sevimlilar filtri
+  if (btnFavoritesToggle) {
+    btnFavoritesToggle.addEventListener('click', () => {
+      isFavsOnly = !isFavsOnly;
+      btnFavoritesToggle.classList.toggle('active', isFavsOnly);
+      triggerHaptic('selection');
+      currentPromptPage = 1;
+      loadPrompts();
+    });
+  }
+
+  // Sahifalash
+  if (btnPrevPage) {
+    btnPrevPage.addEventListener('click', () => {
+      if (currentPromptPage > 1) {
+        currentPromptPage--;
+        triggerHaptic('selection');
+        loadPrompts();
+        window.scrollTo({ top: 180, behavior: 'smooth' });
+      }
+    });
+  }
+
+  if (btnNextPage) {
+    btnNextPage.addEventListener('click', () => {
+      currentPromptPage++;
+      triggerHaptic('selection');
+      loadPrompts();
+      window.scrollTo({ top: 180, behavior: 'smooth' });
+    });
+  }
+
+  // Modal yopish
+  if (btnCloseModal) {
+    btnCloseModal.addEventListener('click', closePromptModal);
+  }
+  if (promptModalOverlay) {
+    promptModalOverlay.addEventListener('click', (e) => {
+      if (e.target === promptModalOverlay) closePromptModal();
+    });
+  }
+
+  // Modal Nusxalash
+  if (btnCopyModalPrompt) {
+    btnCopyModalPrompt.addEventListener('click', () => {
+      if (currentModalPrompt) {
+        copyPromptText(currentModalPrompt.prompt);
+      }
+    });
+  }
+
+  // Modal "AI Bilan Yozish"
+  if (btnUseModalPrompt) {
+    btnUseModalPrompt.addEventListener('click', () => {
+      if (!currentModalPrompt) return;
+      copyPromptText(currentModalPrompt.prompt);
+      showToast("🚀 Prompt nusxalandi! Telegram botga yuboring yoki AI da sinang.");
+      if (tg?.close) {
+        setTimeout(() => {
+          try { tg.close(); } catch(e) {}
+        }, 1200);
+      }
+    });
+  }
+
+  if (favCountBadge) {
+    favCountBadge.textContent = userFavIds.size;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initTelegram();
   setupFilters();
   setupLiveRecorder();
   loadTranscripts();
+  setupPromptsUI();
 });
+

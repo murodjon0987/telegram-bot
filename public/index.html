@@ -36,6 +36,19 @@
         </div>
       </div>
 
+      <!-- Navigation Tabs -->
+      <div class="nav-tabs-wrapper">
+        <button class="nav-tab-btn active" id="tab-btn-transcripts">
+          <span class="tab-icon">🎙️</span>
+          <span class="tab-text">Ovozli Konspektlar</span>
+        </button>
+        <button class="nav-tab-btn" id="tab-btn-prompts">
+          <span class="tab-icon">💡</span>
+          <span class="tab-text">4,000 AI Promptlar</span>
+          <span class="tab-badge">4,000</span>
+        </button>
+      </div>
+
       <!-- Quick Metrics -->
       <div class="metrics-grid">
         <div class="metric-card">
@@ -54,66 +67,147 @@
           <div class="metric-value highlight-text">Gemini 3.6 Flash</div>
         </div>
       </div>
-
-      <!-- Live Voice Recorder Box -->
-      <div class="recorder-box" id="recorder-card">
-        <div class="recorder-left">
-          <button class="record-mic-btn" id="record-mic-btn" title="Ovoz yozishni boshlash">
-            <span class="mic-icon">🎙️</span>
-          </button>
-          <div class="record-info">
-            <h3 id="record-status-text">Jonli ovoz yozish</h3>
-            <p id="record-timer-text">Mikrofonni bosing va gapiring</p>
-          </div>
-        </div>
-        <button class="btn btn-primary" id="btn-stop-analyze" style="display: none;">
-          ⚡ Tahlil qilish
-        </button>
-      </div>
-
-      <!-- Controls -->
-      <div class="controls-section">
-        <div class="search-box">
-          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" id="search-input" placeholder="Mavzu, xulosa yoki topshiriqni qidirish..." autocomplete="off">
-          <button class="clear-search-btn" id="clear-search-btn" style="display: none;">✕</button>
-        </div>
-
-        <div class="filter-pills" id="filter-pills-container">
-          <button class="filter-pill active" data-filter="all">Barchasi</button>
-          <button class="filter-pill" data-filter="Ish & Biznes">💼 Ish & Biznes</button>
-          <button class="filter-pill" data-filter="Salomatlik">🏥 Salomatlik</button>
-          <button class="filter-pill" data-filter="with-tasks">✅ Topshiriqlar bor</button>
-        </div>
-      </div>
     </header>
 
     <!-- Asosiy Kontent -->
     <main class="main-content">
-      <!-- Transkriptlar ro'yxati -->
-      <section class="transcripts-section">
-        <div class="section-header">
-          <h2 class="section-title" id="transcripts-heading">So'nggi Protokollar</h2>
-          <span class="items-counter" id="items-counter-badge">0 ta</span>
+      <!-- 1. OVOZLI KONSPEKTLAR BO'LIMI -->
+      <div id="view-transcripts">
+        <!-- Live Voice Recorder Box -->
+        <div class="recorder-box" id="recorder-card">
+          <div class="recorder-left">
+            <button class="record-mic-btn" id="record-mic-btn" title="Ovoz yozishni boshlash">
+              <span class="mic-icon">🎙️</span>
+            </button>
+            <div class="record-info">
+              <h3 id="record-status-text">Jonli ovoz yozish</h3>
+              <p id="record-timer-text">Mikrofonni bosing va gapiring</p>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btn-stop-analyze" style="display: none;">
+            ⚡ Tahlil qilish
+          </button>
         </div>
 
-        <div class="transcripts-list" id="transcripts-list-container">
-          <div class="loading-state" id="loading-spinner">
-            <div class="spinner"></div>
-            <p>Konspektlar yuklanmoqda...</p>
+        <!-- Controls -->
+        <div class="controls-section">
+          <div class="search-box">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="search-input" placeholder="Mavzu, xulosa yoki topshiriqni qidirish..." autocomplete="off">
+            <button class="clear-search-btn" id="clear-search-btn" style="display: none;">✕</button>
+          </div>
+
+          <div class="filter-pills" id="filter-pills-container">
+            <button class="filter-pill active" data-filter="all">Barchasi</button>
+            <button class="filter-pill" data-filter="Ish & Biznes">💼 Ish & Biznes</button>
+            <button class="filter-pill" data-filter="Salomatlik">🏥 Salomatlik</button>
+            <button class="filter-pill" data-filter="with-tasks">✅ Topshiriqlar bor</button>
           </div>
         </div>
 
-        <div class="empty-state" id="empty-state-view" style="display: none;">
-          <div class="empty-icon">📭</div>
-          <h3>Hech qanday konspekt topilmadi</h3>
-          <p>Botga ovozli xabar yoki krujochek yuboring yoki yuqoridagi mikrofondan yozing.</p>
+        <!-- Transkriptlar ro'yxati -->
+        <section class="transcripts-section">
+          <div class="section-header">
+            <h2 class="section-title" id="transcripts-heading">So'nggi Protokollar</h2>
+            <span class="items-counter" id="items-counter-badge">0 ta</span>
+          </div>
+
+          <div class="transcripts-list" id="transcripts-list-container">
+            <div class="loading-state" id="loading-spinner">
+              <div class="spinner"></div>
+              <p>Konspektlar yuklanmoqda...</p>
+            </div>
+          </div>
+
+          <div class="empty-state" id="empty-state-view" style="display: none;">
+            <div class="empty-icon">📭</div>
+            <h3>Hech qanday konspekt topilmadi</h3>
+            <p>Botga ovozli xabar yoki krujochek yuboring yoki yuqoridagi mikrofondan yozing.</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- 2. 💡 4,000 AI PROMPTLAR BO'LIMI -->
+      <div id="view-prompts" style="display: none;">
+        <!-- Promptlar qidiruvi va amallar -->
+        <div class="prompts-search-section">
+          <div class="search-box">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="prompt-search-input" placeholder="4,000 ta prompt ichidan qidirish (reels, sotuv, pitch, target)..." autocomplete="off">
+            <button class="clear-search-btn" id="clear-prompt-search-btn" style="display: none;">✕</button>
+          </div>
+          
+          <div class="prompts-actions-bar">
+            <button class="btn-action-pill" id="btn-random-prompt">
+              <span>🎲</span> Tasodifiy Prompt
+            </button>
+            <button class="btn-action-pill" id="btn-favorites-toggle">
+              <span>⭐</span> Sevimlilar (<span id="fav-count-badge">0</span>)
+            </button>
+          </div>
+
+          <!-- Toifalar karuseli -->
+          <div class="prompt-categories-carousel" id="prompt-categories-container">
+            <button class="cat-pill active" data-cat="all">🌟 Barchasi (4000)</button>
+          </div>
         </div>
-      </section>
+
+        <!-- Promptlar ro'yxati -->
+        <section class="prompts-section">
+          <div class="section-header">
+            <h2 class="section-title" id="prompts-section-heading">Barcha AI Promptlar</h2>
+            <span class="items-counter" id="prompts-counter-badge">4,000 ta</span>
+          </div>
+
+          <div class="prompts-grid" id="prompts-grid-container">
+            <!-- Dinamik prompt kartochkalari yuklanadi -->
+          </div>
+
+          <!-- Sahifalash -->
+          <div class="pagination-wrapper" id="prompts-pagination">
+            <button class="pagination-btn" id="btn-prev-page" disabled>⬅️ Oldingi</button>
+            <span class="page-indicator" id="page-indicator-text">Sahifa 1 / 200</span>
+            <button class="pagination-btn" id="btn-next-page">Keyingi ➡️</button>
+          </div>
+        </section>
+      </div>
     </main>
+
+    <!-- Prompt Detail Modal -->
+    <div class="modal-overlay" id="prompt-modal-overlay" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-icon" id="modal-prompt-icon">💡</span>
+            <h3 id="modal-prompt-title">Prompt sarlavhasi</h3>
+          </div>
+          <button class="modal-close-btn" id="btn-close-modal">✕</button>
+        </div>
+        <div class="modal-meta" id="modal-prompt-meta"></div>
+        <div class="modal-body">
+          <label class="modal-label">💡 Tavsif:</label>
+          <p class="modal-desc" id="modal-prompt-desc"></p>
+          <label class="modal-label" style="margin-top: 12px;">📋 AI Master Prompt (Nusxalash uchun bosing):</label>
+          <div class="prompt-code-box" id="modal-prompt-code-box">
+            <pre id="modal-prompt-text"></pre>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-copy-modal-prompt">
+            📋 Nusxa olish
+          </button>
+          <button class="btn btn-primary" id="btn-use-modal-prompt">
+            ⚡ AI da Natija Olish
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Toast bildirishnoma -->
     <div class="toast-notification" id="toast-notify" style="display: none;">

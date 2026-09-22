@@ -13,8 +13,14 @@
    - **Qisqacha mazmun (TL;DR):** Audio nima haqida ekanligi.
    - **Topshiriqlar va kelishuvlar (To-Do list):** Kim nima qilishi kerakligi ro'yxati.
    - **So'zma-so'z transkripsiya:** To'liq nutq matni.
-3. 📱 **Telegram Web App (TWA) Interfeysi:**
+3. 💡 **4,000 ta AI Promptlar & Biznes Shablonlari To'plami:**
+   - **10 ta toifa** (SMM, Biznes, Marketing, Kopirayting, Sotuv, HR, IT, Moliya, Ta'lim, Kreativ AI) bo'yicha har birida 400 tadan jami 4000 ta sifatli master-prompt.
+   - Botda `/prompts` buyrug'i, interaktiv toifalar, sahifalash va bir bosishda **"⚡ AI da ishlatish"** imkoniyati.
+   - Telegram Inline Mode: `@bot prompt [so'z]` orqali istalgan chatda lahzalik prompt qidirish.
+   - Web App (Mini App)da zamonaviy toifalar karuseli, jonli qidiruv, sevimlilar va 1-click nusxalash.
+4. 📱 **Telegram Web App (TWA) Interfeysi:**
    - Qorong'u rejim (dark mode), neon va glassmorphic dizayn.
+   - Ovozli konspektlar va 4,000 AI promptlar tablari.
    - Topshiriqlarni bir bosish bilan bajarilgan qilib belgilash (Interactive checklist).
    - Qidiruv, nusxalash va ulashish imkoniyatlari.
    - Telegram Haptic Feedback (tebranish effektlari) bilan to'liq integratsiya.

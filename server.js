@@ -9,7 +9,13 @@ import {
   toggleActionItem, 
   deleteTranscript, 
   saveTranscript,
-  getSystemStats
+  getSystemStats,
+  getPromptCategories,
+  searchPrompts,
+  getPromptById,
+  getRandomPrompt,
+  getUserFavorites,
+  toggleFavoritePrompt
 } from './storage.js';
 import { analyzeMedia } from './aiService.js';
 
@@ -91,6 +97,58 @@ app.post('/api/analyze-audio', async (req, res) => {
     console.error("Web audio tahlilida xato:", err);
     res.status(500).json({ success: false, message: err.message });
   }
+});
+
+// ==========================================
+// 💡 4000 TA AI PROMPTLAR API ENDPOINTLARI
+// ==========================================
+
+// Toifalar va statistika
+app.get('/api/prompts/categories', (req, res) => {
+  const categories = getPromptCategories();
+  res.json({ success: true, data: categories });
+});
+
+// Qidiruv va filtrlash bilan promptlar ro'yxati
+app.get('/api/prompts', (req, res) => {
+  const { query, category, subcategory, page, limit } = req.query;
+  const result = searchPrompts({
+    query: query || '',
+    categoryId: category || null,
+    subcategoryTag: subcategory || null,
+    page: page || 1,
+    limit: limit || 20
+  });
+  res.json({ success: true, ...result });
+});
+
+// Tasodifiy bitta prompt
+app.get('/api/prompts/random', (req, res) => {
+  const { category } = req.query;
+  const prompt = getRandomPrompt(category || null);
+  if (!prompt) return res.status(404).json({ success: false, message: "Prompt topilmadi" });
+  res.json({ success: true, data: prompt });
+});
+
+// Bitta promptni ID bo'yicha olish
+app.get('/api/prompts/:id', (req, res) => {
+  const prompt = getPromptById(req.params.id);
+  if (!prompt) return res.status(404).json({ success: false, message: "Prompt topilmadi" });
+  res.json({ success: true, data: prompt });
+});
+
+// Foydalanuvchining sevimli promptlari
+app.get('/api/prompts/user/favorites', (req, res) => {
+  const { userId } = req.query;
+  const favs = getUserFavorites(userId || 'webapp_user');
+  res.json({ success: true, count: favs.length, data: favs });
+});
+
+// Sevimlilarga qo'shish yoki olib tashlash
+app.post('/api/prompts/favorite', (req, res) => {
+  const { userId, promptId } = req.body;
+  const result = toggleFavoritePrompt(userId || 'webapp_user', promptId);
+  res.json({ success: true, ...result });
 });
 
 // Asosiy sahifa
