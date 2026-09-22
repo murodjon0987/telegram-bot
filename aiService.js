@@ -63,7 +63,7 @@ Eslatma: Faqat JSON qaytaring, boshqa hech qanday belgi yoki kirish so'zi qo'shm
 `;
 
   try {
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
     let lastError = null;
 
     for (const model of modelsToTry) {

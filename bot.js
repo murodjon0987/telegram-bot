@@ -26,13 +26,21 @@ export function createBot() {
 
   const bot = new Bot(token);
 
+  // Global xatolik tutuvchi (bot to'xtab qolmasligi uchun)
+  bot.catch((err) => {
+    console.error(`❌ Botda xatolik:`, err.error?.message || err.error || err);
+  });
+
   // /start buyrug'i
   bot.command('start', async (ctx) => {
     const firstName = ctx.from?.first_name || 'foydalanuvchi';
     
-    const keyboard = new InlineKeyboard()
-      .webApp('🌐 Web App Konspektlar', webappUrl)
-      .row()
+    const keyboard = new InlineKeyboard();
+    // Telegram faqat HTTPS havolalarni Web App tugmasi sifatida qabul qiladi
+    if (webappUrl && webappUrl.startsWith('https://')) {
+      keyboard.webApp('🌐 Web App Konspektlar', webappUrl).row();
+    }
+    keyboard
       .text('💡 Qanday ishlaydi?', 'help_info')
       .text('📊 Mening statistikalarim', 'my_stats');
 
@@ -167,10 +175,11 @@ Majlis yoki darslarda suhbatni ovozli xabar qilib botga tashlasangiz, kim qanday
         messageText += `\n⚠️ <i>(Eslatma: Bu demo tahlil natijasi. Haqiqiy AI ovoz tahlili uchun .env faylida GEMINI_API_KEY ko'rsating)</i>`;
       }
 
-      const itemKeyboard = new InlineKeyboard()
-        .webApp('🌐 Web App\'da ochish', `${webappUrl}?item=${savedItem.id}`)
-        .row()
-        .text('📋 Vazifalar ro\'yxati', `show_actions_${savedItem.id}`);
+      const itemKeyboard = new InlineKeyboard();
+      if (webappUrl && webappUrl.startsWith('https://')) {
+        itemKeyboard.webApp('🌐 Web App\'da ochish', `${webappUrl}?item=${savedItem.id}`).row();
+      }
+      itemKeyboard.text('📋 Vazifalar ro\'yxati', `show_actions_${savedItem.id}`);
 
       await ctx.reply(messageText, {
         parse_mode: 'HTML',
